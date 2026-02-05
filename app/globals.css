@@ -1,26 +1,66 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Renk Paleti Tanımları (CSS Değişkenleri) */
+    --background: 248 250 252; /* Slate-50 (#f8fafc) */
+    --foreground: 17 24 39;    /* Gray-900 (#111827) */
+    
+    --primary: 234 88 12;      /* Orange-600 (#ea580c) */
+    --primary-hover: 194 65 12;/* Orange-700 (#c2410c) */
+    
+    --secondary: 17 24 39;     /* Gray-900 */
+    --secondary-sub: 75 85 99; /* Gray-600 */
   }
-}
+.card-animated-border {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-animated-border::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    z-index: 10;
+    pointer-events: none;
+  }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Hover durumunda kenarlık rengi ve hafif bir içe göçme hissi */
+  .card-animated-border:hover::before {
+    border-color: rgb(var(--primary));
+    transform: scale(0.98); /* Hafifçe içeri odaklar */
+  }
+
+  /* Daha gelişmiş "Dolaşan Çizgi" efekti (İsteğe bağlı alternatif) */
+  .draw-border {
+    position: relative;
+  }
+  .draw-border::after, .draw-border::before {
+    content: "";
+    position: absolute;
+    width: 0;
+    height: 0;
+    background: rgb(var(--primary));
+    transition: all 0.4s ease;
+  }
+  /* Üst ve Sol Çizgi */
+  .draw-border::before { top: 0; left: 0; }
+  /* Alt ve Sağ Çizgi */
+  .draw-border::after { bottom: 0; right: 0; }
+  
+  .draw-border:hover::before, .draw-border:hover::after {
+    width: 100%;
+    height: 2px; 
+  }
+  body {
+    /* @apply yerine standart CSS kullanımı */
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+  }
 }
