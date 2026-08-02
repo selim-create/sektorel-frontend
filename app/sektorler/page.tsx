@@ -13,7 +13,7 @@ import * as LucideIcons from "lucide-react";
 export const revalidate = 3600; // 1 saatte bir yenile
 
 export default async function SectorsPage() {
-  const { data } = await queryWithFallback<any>({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "sectors listing");
+  const { data } = await queryWithFallback({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "sectors listing");
   const sectors = data?.sectors?.nodes || [];
 
   return (

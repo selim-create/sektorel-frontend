@@ -77,7 +77,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data, hasError } = await queryWithFallback<any>({
+  const { data, hasError } = await queryWithFallback({
     query: GET_POST_DATA,
     variables: { slug }
   }, { post: null, posts: { nodes: [] } }, `news detail ${slug}`);

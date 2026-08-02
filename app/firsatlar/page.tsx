@@ -20,7 +20,7 @@ import {
 export const revalidate = 60;
 
 export default async function LeadsPage() {
-  const { data } = await queryWithFallback<any>({ query: GET_LEADS }, { leads: { nodes: [] } }, "leads listing");
+  const { data } = await queryWithFallback({ query: GET_LEADS }, { leads: { nodes: [] } }, "leads listing");
   const leads = data?.leads?.nodes || [];
 
   return (

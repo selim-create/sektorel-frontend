@@ -17,7 +17,7 @@ import {
 export const revalidate = 60;
 
 export default async function CareerPage() {
-  const { data } = await queryWithFallback<any>({ query: GET_JOBS }, { jobs: { nodes: [] } }, "jobs listing");
+  const { data } = await queryWithFallback({ query: GET_JOBS }, { jobs: { nodes: [] } }, "jobs listing");
   const jobs = data?.jobs?.nodes || [];
 
   return (

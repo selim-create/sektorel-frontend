@@ -26,9 +26,9 @@ export default async function Home() {
     { data: companyData, hasError: companyError },
     { data: eventData, hasError: eventError },
   ] = await Promise.all([
-    queryWithFallback<any>({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "homepage sectors"),
-    queryWithFallback<any>({ query: GET_COMPANIES }, { companies: { nodes: [] } }, "homepage companies"),
-    queryWithFallback<any>({ query: GET_EVENTS }, { events: { nodes: [] } }, "homepage events"),
+    queryWithFallback({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "homepage sectors"),
+    queryWithFallback({ query: GET_COMPANIES }, { companies: { nodes: [] } }, "homepage companies"),
+    queryWithFallback({ query: GET_EVENTS }, { events: { nodes: [] } }, "homepage events"),
   ]);
 
   const sectors = sectorData?.sectors?.nodes || [];

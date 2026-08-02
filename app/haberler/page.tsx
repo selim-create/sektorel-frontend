@@ -50,7 +50,7 @@ const GET_NEWS_PAGE_DATA = gql`
 export const revalidate = 60;
 
 export default async function NewsPage() {
-  const { data } = await queryWithFallback<any>(
+  const { data } = await queryWithFallback(
     { query: GET_NEWS_PAGE_DATA },
     { posts: { nodes: [] }, categories: { nodes: [] } },
     "news listing",

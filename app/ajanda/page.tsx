@@ -9,7 +9,7 @@ import {
 export const revalidate = 60;
 
 export default async function AgendaPage() {
-  const { data } = await queryWithFallback<any>({ query: GET_EVENTS }, { events: { nodes: [] } }, "agenda listing");
+  const { data } = await queryWithFallback({ query: GET_EVENTS }, { events: { nodes: [] } }, "agenda listing");
   const events = data?.events?.nodes || [];
 
   return (

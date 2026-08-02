@@ -16,7 +16,7 @@ import {
 export default async function JobDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const { data, hasError } = await queryWithFallback<any>({
+  const { data, hasError } = await queryWithFallback({
     query: GET_JOB_DATA,
     variables: { slug }
   }, { job: null }, `job detail ${slug}`);
