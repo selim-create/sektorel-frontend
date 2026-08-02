@@ -45,6 +45,22 @@ const statusLabels: Record<string, string> = {
   private: "Özel",
 };
 
+const dateFormatter = new Intl.DateTimeFormat("tr-TR", {
+  dateStyle: "medium",
+  timeZone: "UTC",
+});
+
+function formatContentDate(value?: string | null) {
+  if (!value) return "Tarih bilgisi yok";
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Tarih bilgisi yok";
+  }
+
+  return dateFormatter.format(parsedDate);
+}
+
 type OwnedContentManagerProps = {
   title: string;
   description: string;
@@ -115,7 +131,7 @@ export default function OwnedContentManager({
               title: string;
               type: string;
               status: string;
-              date: string;
+              date?: string | null;
             }) => (
               <div key={`${item.type}-${item.databaseId}`} className="p-5 flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -129,10 +145,7 @@ export default function OwnedContentManager({
                   </div>
                   <h2 className="font-bold text-secondary truncate">{item.title}</h2>
                   <span className="text-xs text-gray-400 mt-1 block">
-                    {new Intl.DateTimeFormat("tr-TR", {
-                      dateStyle: "medium",
-                      timeZone: "UTC",
-                    }).format(new Date(item.date))}
+                    {formatContentDate(item.date)}
                   </span>
                 </div>
 
