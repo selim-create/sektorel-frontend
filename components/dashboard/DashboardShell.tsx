@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { gql } from "@apollo/client";
@@ -15,7 +16,12 @@ import {
   Building2,
   Calendar,
 } from "lucide-react";
-import { clearSession, getRefreshToken, getSessionUser } from "@/lib/auth";
+import {
+  clearSession,
+  getRefreshToken,
+  getSessionUser,
+  type SessionUser,
+} from "@/lib/auth";
 
 const SESSION_QUERY = gql`
   query SektorelSession {
@@ -56,7 +62,14 @@ function initials(value: string) {
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const fallbackUser = getSessionUser();
+  const [fallbackUser, setFallbackUser] = useState<SessionUser | null>(null);
+
+  // localStorage yalnızca mount sonrasında okunur. Böylece sunucu çıktısı ile
+  // tarayıcının ilk render'ı aynı kalır ve hydration farkı oluşmaz.
+  useEffect(() => {
+    setFallbackUser(getSessionUser());
+  }, []);
+
   const { data, loading } = useQuery(SESSION_QUERY, {
     fetchPolicy: "cache-and-network",
     errorPolicy: "all",
@@ -103,7 +116,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
           <div className="min-w-0">
             <span className="block text-sm font-bold truncate w-36">
-              {loading && !profile ? "Yükleniyor..." : displayName}
+              {loading && !profile && !fallbackUser ? "Yükleniyor..." : displayName}
             </span>
             <span className="text-[10px] text-gray-400 uppercase">{accountLabel}</span>
           </div>
