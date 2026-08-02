@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_ALL_SECTORS } from "@/lib/queries";
 import { 
   Building2, 
@@ -13,7 +13,7 @@ import * as LucideIcons from "lucide-react";
 export const revalidate = 3600; // 1 saatte bir yenile
 
 export default async function SectorsPage() {
-  const { data } = await getClient().query<any>({ query: GET_ALL_SECTORS });
+  const { data } = await queryWithFallback({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "sectors listing");
   const sectors = data?.sectors?.nodes || [];
 
   return (

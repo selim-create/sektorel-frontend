@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   Calendar, 
@@ -61,16 +62,23 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data } = await getClient().query({
+  const { data, hasError } = await queryWithFallback({
     query: GET_EVENT_DATA,
     variables: { slug }
-  });
+  }, { event: null }, `event detail ${slug}`);
 
   const event = data?.event;
 
   // 404 Kontrolü
   if (!event) {
-    return (
+    return hasError ? (
+      <FallbackUI
+        title="Etkinlik verisi yüklenemedi"
+        message="Etkinlik detayları şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Ajandaya dön"
+        href="/ajanda"
+      />
+    ) : (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Etkinlik Bulunamadı</h1>

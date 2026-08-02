@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_LEADS } from "@/lib/queries";
 import { 
   Briefcase, 
@@ -20,7 +20,7 @@ import {
 export const revalidate = 60;
 
 export default async function LeadsPage() {
-  const { data } = await getClient().query<any>({ query: GET_LEADS });
+  const { data } = await queryWithFallback({ query: GET_LEADS }, { leads: { nodes: [] } }, "leads listing");
   const leads = data?.leads?.nodes || [];
 
   return (

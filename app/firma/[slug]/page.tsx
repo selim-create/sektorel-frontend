@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   MapPin, 
@@ -113,15 +114,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data } = await getClient().query({
+  const { data, hasError } = await queryWithFallback({
     query: GET_COMPANY_DATA,
     variables: { slug }
-  });
+  }, { company: null }, `company detail ${slug}`);
 
   const company = data?.company;
 
   if (!company) {
-    return (
+    return hasError ? (
+      <FallbackUI
+        title="Firma verisi yüklenemedi"
+        message="Firma detayları şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Firma rehberine dön"
+        href="/firmalar"
+      />
+    ) : (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Firma Bulunamadı</h1>

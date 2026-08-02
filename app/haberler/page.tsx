@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   Calendar, 
@@ -50,7 +50,11 @@ const GET_NEWS_PAGE_DATA = gql`
 export const revalidate = 60;
 
 export default async function NewsPage() {
-  const { data } = await getClient().query<any>({ query: GET_NEWS_PAGE_DATA });
+  const { data } = await queryWithFallback(
+    { query: GET_NEWS_PAGE_DATA },
+    { posts: { nodes: [] }, categories: { nodes: [] } },
+    "news listing",
+  );
   
   const posts = data?.posts?.nodes || [];
   const categories = data?.categories?.nodes || [];

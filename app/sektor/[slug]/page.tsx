@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   Building2, 
@@ -68,10 +69,10 @@ export default async function SectorDetailPage({ params }: { params: Promise<{ s
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data } = await getClient().query({
+  const { data, hasError } = await queryWithFallback({
     query: GET_SECTOR_DATA,
     variables: { slug: slug } // Artık sectorSlug parametresine gerek yok
-  });
+  }, { sector: null }, `sector detail ${slug}`);
 
   const sector = data?.sector;
   // Firmalar artık sektör objesinin içinde geliyor
@@ -79,7 +80,16 @@ export default async function SectorDetailPage({ params }: { params: Promise<{ s
   
   // Eğer sektör bulunamazsa 404 dönebilir veya boş state gösterebiliriz
   if (!sector) {
-    return <div className="p-20 text-center">Sektör bulunamadı.</div>;
+    return hasError ? (
+      <FallbackUI
+        title="Sektör verisi yüklenemedi"
+        message="Sektör detayları şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Sektörlere dön"
+        href="/sektorler"
+      />
+    ) : (
+      <div className="p-20 text-center">Sektör bulunamadı.</div>
+    );
   }
 
   // Dinamik İkon
