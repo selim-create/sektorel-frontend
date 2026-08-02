@@ -76,6 +76,7 @@ export const GET_EVENTS = gql`
         title
         slug
         content
+        date
         eventDetails {
           eventType
           isOfficial
@@ -91,6 +92,41 @@ export const GET_EVENTS = gql`
             sourceUrl
           }
         }
+      }
+    }
+  }
+`;
+
+export const GET_EVENTS_PAGINATED = gql`
+  query GetEventsPaginated($first: Int = 100, $after: String) {
+    events(first: $first, after: $after, where: { orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        content
+        date
+        eventDetails {
+          eventType
+          isOfficial
+          startDate
+          endDate
+          locationType
+          venue
+          address
+          price
+          organizer
+          registrationLink
+        }
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
       }
     }
   }
