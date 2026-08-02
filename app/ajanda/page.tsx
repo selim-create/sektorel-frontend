@@ -1,127 +1,604 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { queryWithFallback } from "@/lib/graphql-client";
-import { GET_EVENTS } from "@/lib/queries";
-import { 
-  Calendar, MapPin, Clock, Filter, Search, ChevronRight, 
-  Plus, Download, Share2, Ticket, AlertCircle, Video 
+import {
+  endOfDay,
+  format,
+  isAfter,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  parseISO,
+  startOfDay,
+  startOfToday,
+} from "date-fns";
+import { tr } from "date-fns/locale";
+import {
+  BellRing,
+  Calendar,
+  CalendarRange,
+  ChevronRight,
+  MapPin,
+  Plus,
+  Sparkles,
+  Star,
 } from "lucide-react";
+import EventCalendar from "@/components/agenda/EventCalendar";
+import EventFilters from "@/components/agenda/EventFilters";
+import EventList from "@/components/agenda/EventList";
+import FallbackUI from "@/components/error/FallbackUI";
+import {
+  type AgendaEvent,
+  type AgendaTaxonomy,
+  extractLikelyCity,
+  formatMonthValue,
+  getSearchableEventText,
+  parseEventDate,
+  parsePriceValue,
+  slugify,
+  stripHtml,
+} from "@/lib/agenda";
+import { queryWithFallback } from "@/lib/graphql-client";
+import { GET_ALL_SECTORS, GET_EVENTS_PAGINATED } from "@/lib/queries";
 
 export const revalidate = 60;
 
-export default async function AgendaPage() {
-  const { data } = await queryWithFallback({ query: GET_EVENTS }, { events: { nodes: [] } }, "agenda listing");
-  const events = data?.events?.nodes || [];
+const EVENTS_FALLBACK = {
+  events: {
+    nodes: [] as EventNode[],
+    pageInfo: {
+      endCursor: null as string | null,
+      hasNextPage: false,
+    },
+  },
+};
+
+const SECTORS_FALLBACK = {
+  sectors: {
+    nodes: [] as SectorNode[],
+  },
+};
+
+type SearchParams = Promise<{
+  view?: string | string[];
+  month?: string | string[];
+  type?: string | string[];
+  sector?: string | string[];
+  location?: string | string[];
+  from?: string | string[];
+  to?: string | string[];
+  q?: string | string[];
+  sort?: string | string[];
+  page?: string | string[];
+  priceMax?: string | string[];
+  date?: string | string[];
+}>;
+
+type EventNode = {
+  id?: string | null;
+  title?: string | null;
+  slug?: string | null;
+  content?: string | null;
+  date?: string | null;
+  eventDetails?: {
+    eventType?: string | null;
+    isOfficial?: boolean | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    locationType?: string | null;
+    venue?: string | null;
+    address?: string | null;
+    price?: string | null;
+    organizer?: string | null;
+    registrationLink?: string | null;
+  } | null;
+  featuredImage?: {
+    node?: {
+      sourceUrl?: string | null;
+    } | null;
+  } | null;
+};
+
+type EventsQueryData = {
+  events?: {
+    nodes?: EventNode[] | null;
+    pageInfo?: {
+      endCursor?: string | null;
+      hasNextPage?: boolean | null;
+    } | null;
+  } | null;
+};
+
+type SectorNode = {
+  name?: string | null;
+  slug?: string | null;
+};
+
+type SectorsQueryData = {
+  sectors?: {
+    nodes?: SectorNode[] | null;
+  } | null;
+};
+
+function getSingleValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function getValidMonth(value: string) {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return formatMonthValue(new Date());
+  }
+
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) {
+    return formatMonthValue(new Date());
+  }
+
+  return value;
+}
+
+function getMonthDate(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
+function buildSectorMatches(text: string, sectors: AgendaTaxonomy[]) {
+  return sectors.filter((sector) => text.includes(sector.name.toLocaleLowerCase("tr-TR")));
+}
+
+function normalizeEvent(node: EventNode, sectors: AgendaTaxonomy[]): AgendaEvent | null {
+  if (!node.id || !node.slug) {
+    return null;
+  }
+
+  const details = node.eventDetails ?? {};
+  const excerpt = stripHtml(node.content).slice(0, 220) || "Etkinlik detayları yakında paylaşılacak.";
+  const searchableText = [
+    node.title,
+    node.content,
+    details.eventType,
+    details.organizer,
+    details.venue,
+    details.address,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  const sectorLabels = buildSectorMatches(searchableText, sectors);
+  const city = extractLikelyCity(details.venue, details.address, node.content);
+  const popularityScore =
+    (details.isOfficial ? 1500 : 0) +
+    (node.featuredImage?.node?.sourceUrl ? 400 : 0) +
+    (details.organizer ? 120 : 0) +
+    excerpt.length;
+
+  return {
+    id: node.id,
+    title: node.title?.trim() || "Başlıksız etkinlik",
+    slug: node.slug,
+    content: node.content || "",
+    excerpt,
+    date: node.date ?? null,
+    imageUrl: node.featuredImage?.node?.sourceUrl ?? null,
+    sectorLabels,
+    city,
+    popularityScore,
+    eventDetails: {
+      eventType: details.eventType?.trim() || "Diğer",
+      isOfficial: Boolean(details.isOfficial),
+      startDate: details.startDate ?? node.date ?? null,
+      endDate: details.endDate ?? null,
+      locationType: details.locationType?.trim() || "physical",
+      venue: details.venue?.trim() || null,
+      address: details.address?.trim() || null,
+      price: details.price?.trim() || null,
+      organizer: details.organizer?.trim() || null,
+      registrationLink: details.registrationLink?.trim() || null,
+    },
+  };
+}
+
+function sortEvents(events: AgendaEvent[], sort: string) {
+  return [...events].sort((left, right) => {
+    const leftDate = parseEventDate(left.eventDetails.startDate)?.getTime() ?? 0;
+    const rightDate = parseEventDate(right.eventDetails.startDate)?.getTime() ?? 0;
+
+    if (sort === "date-desc") {
+      return rightDate - leftDate;
+    }
+
+    if (sort === "type") {
+      return left.eventDetails.eventType.localeCompare(right.eventDetails.eventType, "tr");
+    }
+
+    if (sort === "popularity") {
+      return right.popularityScore - left.popularityScore || leftDate - rightDate;
+    }
+
+    return leftDate - rightDate;
+  });
+}
+
+async function fetchAllEvents() {
+  const collected: EventNode[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+  let hasError = false;
+  let safetyCounter = 0;
+
+  while (hasNextPage && safetyCounter < 5 && collected.length < 300) {
+    safetyCounter += 1;
+
+    const result: { data: EventsQueryData; hasError: boolean } = await queryWithFallback<
+      EventsQueryData,
+      { first: number; after: string | null }
+    >(
+      {
+        query: GET_EVENTS_PAGINATED,
+        variables: { first: 100, after },
+      },
+      EVENTS_FALLBACK,
+      `agenda listing page ${safetyCounter}`,
+    );
+
+    hasError = hasError || result.hasError;
+
+    const nodes: EventNode[] = result.data?.events?.nodes ?? [];
+    const pageInfo: { endCursor?: string | null; hasNextPage?: boolean | null } | null | undefined =
+      result.data?.events?.pageInfo;
+
+    collected.push(...nodes);
+    after = pageInfo?.endCursor ?? null;
+    hasNextPage = Boolean(pageInfo?.hasNextPage && after);
+  }
+
+  return {
+    nodes: collected,
+    hasError,
+  };
+}
+
+export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const params = await searchParams;
+  const monthValue = getValidMonth(getSingleValue(params.month) || formatMonthValue(new Date()));
+  const monthLabel = format(getMonthDate(monthValue), "LLLL yyyy", { locale: tr });
+
+  return {
+    title: `Etkinlik Ajandası | ${monthLabel} | Sektörel Ajanda`,
+    description:
+      "Sektörel etkinlik takvimi üzerinde konferans, seminer, workshop ve networking etkinliklerini filtreleyerek takip edin.",
+  };
+}
+
+export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const viewParam = getSingleValue(resolvedSearchParams.view);
+  const view = viewParam === "list" ? "list" : "calendar";
+  const monthValue = getValidMonth(getSingleValue(resolvedSearchParams.month) || formatMonthValue(new Date()));
+  const type = getSingleValue(resolvedSearchParams.type);
+  const sector = getSingleValue(resolvedSearchParams.sector);
+  const location = getSingleValue(resolvedSearchParams.location);
+  const from = getSingleValue(resolvedSearchParams.from);
+  const to = getSingleValue(resolvedSearchParams.to);
+  const q = getSingleValue(resolvedSearchParams.q).trim();
+  const sort = getSingleValue(resolvedSearchParams.sort) || "date-asc";
+  const selectedDate = getSingleValue(resolvedSearchParams.date);
+  const currentPage = Math.max(1, Number.parseInt(getSingleValue(resolvedSearchParams.page) || "1", 10) || 1);
+  const priceMax = getSingleValue(resolvedSearchParams.priceMax) || "50000";
+  const monthDate = getMonthDate(monthValue);
+
+  const [eventsResult, sectorsResult] = await Promise.all([
+    fetchAllEvents(),
+    queryWithFallback<SectorsQueryData>({ query: GET_ALL_SECTORS }, SECTORS_FALLBACK, "agenda sectors"),
+  ]);
+
+  const sectorCatalog = (sectorsResult.data?.sectors?.nodes ?? [])
+    .filter((item): item is SectorNode & { name: string; slug: string } => Boolean(item?.name && item.slug))
+    .map((item) => ({ name: item.name, slug: item.slug }));
+
+  const normalizedEvents = eventsResult.nodes
+    .map((node) => normalizeEvent(node, sectorCatalog))
+    .filter((item): item is AgendaEvent => Boolean(item))
+    .filter((item) => Boolean(parseEventDate(item.eventDetails.startDate)));
+
+  if ((eventsResult.hasError || sectorsResult.hasError) && normalizedEvents.length === 0) {
+    return (
+      <FallbackUI
+        title="Etkinlik ajandası yüklenemedi"
+        message="Etkinlik verileri şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Ana sayfaya dön"
+        href="/"
+      />
+    );
+  }
+
+  const today = startOfToday();
+  const normalizedQuery = q.toLocaleLowerCase("tr-TR");
+  const maxPriceValue = Number(priceMax) || 50000;
+  const fromDate = from ? startOfDay(parseISO(from)) : null;
+  const toDate = to ? endOfDay(parseISO(to)) : null;
+
+  const filteredEvents = normalizedEvents.filter((event) => {
+    const startDate = parseEventDate(event.eventDetails.startDate);
+    if (!startDate) return false;
+
+    if (type && event.eventDetails.eventType !== type) {
+      return false;
+    }
+
+    if (sector && !event.sectorLabels.some((item) => item.slug === sector)) {
+      return false;
+    }
+
+    if (location) {
+      const locationSlug = slugify(location);
+      const eventLocationSlug = slugify(event.city || event.eventDetails.venue || "");
+      if (!eventLocationSlug || eventLocationSlug !== locationSlug) {
+        return false;
+      }
+    }
+
+    if (normalizedQuery && !getSearchableEventText(event).includes(normalizedQuery)) {
+      return false;
+    }
+
+    if (fromDate && isBefore(startDate, fromDate)) {
+      return false;
+    }
+
+    if (toDate && isAfter(startDate, toDate)) {
+      return false;
+    }
+
+    const parsedPrice = parsePriceValue(event.eventDetails.price);
+    if (parsedPrice !== null && parsedPrice > maxPriceValue) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const featuredEvents = sortEvents(
+    filteredEvents.filter((event) => {
+      const startDate = parseEventDate(event.eventDetails.startDate);
+      return Boolean(startDate && !isBefore(startDate, today));
+    }),
+    "popularity",
+  ).slice(0, 4);
+
+  const upcomingEvents = sortEvents(
+    filteredEvents.filter((event) => {
+      const startDate = parseEventDate(event.eventDetails.startDate);
+      return Boolean(startDate && !isBefore(startDate, today));
+    }),
+    sort,
+  );
+
+  const archiveEvents = sortEvents(
+    filteredEvents.filter((event) => {
+      const startDate = parseEventDate(event.eventDetails.startDate);
+      return Boolean(startDate && isBefore(startDate, today));
+    }),
+    "date-desc",
+  );
+
+  const selectedDayEvents = selectedDate
+    ? sortEvents(
+        filteredEvents.filter((event) => {
+          const startDate = parseEventDate(event.eventDetails.startDate);
+          return Boolean(startDate && isSameDay(startDate, parseISO(selectedDate)));
+        }),
+        sort,
+      )
+    : [];
+
+  const calendarEvents = sortEvents(
+    filteredEvents.filter((event) => {
+      const startDate = parseEventDate(event.eventDetails.startDate);
+      return Boolean(startDate && isSameMonth(startDate, monthDate));
+    }),
+    "date-asc",
+  );
+
+  const listSource = selectedDate ? selectedDayEvents : upcomingEvents;
+  const pageSize = 6;
+  const totalPages = Math.max(1, Math.ceil(listSource.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedList = listSource.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const eventTypes = Array.from(new Set(normalizedEvents.map((event) => event.eventDetails.eventType))).sort((left, right) =>
+    left.localeCompare(right, "tr"),
+  );
+  const matchedSectors = Array.from(
+    new Map(filteredEvents.flatMap((event) => event.sectorLabels).map((item) => [item.slug, item])).values(),
+  ).sort((left, right) => left.name.localeCompare(right.name, "tr"));
+  const locationOptions = Array.from(new Set(normalizedEvents.map((event) => event.city).filter(Boolean) as string[])).sort((left, right) =>
+    left.localeCompare(right, "tr"),
+  );
+
+  const baseParams = {
+    ...(q ? { q } : {}),
+    ...(type ? { type } : {}),
+    ...(sector ? { sector } : {}),
+    ...(location ? { location } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(sort !== "date-asc" ? { sort } : {}),
+    ...(priceMax !== "50000" ? { priceMax } : {}),
+    ...(view === "list" ? { view } : {}),
+    month: monthValue,
+    ...(selectedDate ? { date: selectedDate } : {}),
+  };
+
+  const selectedDayLabel = selectedDate
+    ? format(parseISO(selectedDate), "d MMMM yyyy, EEEE", { locale: tr })
+    : null;
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20 font-sans">
-      
-      {/* HERO */}
-      <section className="bg-secondary text-white py-16 px-4 border-b border-gray-800 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-        <div className="container mx-auto relative z-10">
-           <div className="flex flex-col md:flex-row items-end justify-between gap-6">
-             <div>
-               <div className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 bg-white/5 border border-white/10 px-3 py-1">
-                 <Calendar size={12} className="text-primary"/> Sektörel Etkinlik Takvimi
-               </div>
-               <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight flex items-center gap-4">İş Ajandası</h1>
-               <p className="text-gray-400 mt-4 text-lg max-w-2xl">Fuarlar, seminerler ve resmi mali takvim tek bir noktada.</p>
-             </div>
-             <div className="flex gap-4">
-               <Link href="/ajanda/olustur" className="bg-primary hover:bg-primary-hover text-white px-6 py-4 font-bold uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg">
-                 <Plus size={18} /> Etkinlik Gönder
-               </Link>
-             </div>
-           </div>
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      <section className="relative overflow-hidden border-b border-gray-800 bg-secondary px-4 py-16 text-white">
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+
+        <div className="container relative z-10 mx-auto">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-gray-300">
+                <Calendar size={12} className="text-primary" />
+                Sektörel Etkinlik Takvimi
+              </div>
+              <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">İş Ajandası</h1>
+              <p className="mt-4 max-w-2xl text-lg leading-8 text-gray-300">
+                Konferanslardan workshop’lara, resmi takvimden networking buluşmalarına kadar tüm sektörel etkinlikleri tek sayfada izleyin.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/ajanda/olustur"
+                className="inline-flex items-center gap-2 bg-primary px-5 py-4 text-sm font-black uppercase tracking-[0.25em] text-white transition hover:bg-primary-hover"
+              >
+                <Plus size={16} /> Etkinlik Gönder
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="border border-white/10 bg-white/5 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Yaklaşan</p>
+              <p className="mt-3 text-3xl font-black">{upcomingEvents.length}</p>
+            </div>
+            <div className="border border-white/10 bg-white/5 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Bu ay</p>
+              <p className="mt-3 text-3xl font-black">{calendarEvents.length}</p>
+            </div>
+            <div className="border border-white/10 bg-white/5 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Resmi Takvim</p>
+              <p className="mt-3 text-3xl font-black">{normalizedEvents.filter((event) => event.eventDetails.isOfficial).length}</p>
+            </div>
+            <div className="border border-white/10 bg-white/5 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Şehir</p>
+              <p className="mt-3 text-3xl font-black">{locationOptions.length}</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex flex-col lg:flex-row gap-12">
-          
-          {/* SIDEBAR (Statik Filtreler Şimdilik) */}
-          <aside className="w-full lg:w-1/4 space-y-8">
-            <div className="bg-white border border-gray-200 p-6 shadow-sm">
-               <h3 className="text-sm font-black text-secondary uppercase tracking-widest mb-6 border-b border-gray-100 pb-2 flex items-center gap-2">
-                 <Filter size={16} className="text-gray-400"/> Kategoriler
-               </h3>
-               <div className="space-y-3">
-                 {['Tümü', 'Fuarlar', 'Resmi Takvim', 'Webinarlar'].map((cat, i) => (
-                   <label key={i} className="flex items-center justify-between cursor-pointer group">
-                     <div className="flex items-center gap-3">
-                        <input type="checkbox" className="peer h-4 w-4 appearance-none border border-gray-300 checked:bg-primary checked:border-primary transition-all rounded-none" />
-                        <span className="text-sm text-gray-600 group-hover:text-primary transition-colors font-medium">{cat}</span>
-                     </div>
-                   </label>
-                 ))}
-               </div>
+      <div className="container mx-auto space-y-10 px-4 py-10">
+        {eventsResult.hasError || sectorsResult.hasError ? (
+          <div className="border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-700">
+            Bazı etkinlik verileri geçici olarak alınamadı. Sayfa mevcut içeriklerle gösteriliyor.
+          </div>
+        ) : null}
+
+        {featuredEvents.length > 0 ? (
+          <section className="space-y-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-gray-400">
+                  <Sparkles size={14} className="text-primary" /> Öne Çıkan Etkinlikler
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-secondary">Gündemdeki buluşmalar</h2>
+              </div>
+              <p className="max-w-xl text-sm leading-7 text-gray-500">
+                İlk bakışta kaçırmamanız gereken önemli etkinlikler ve resmi duyurular.
+              </p>
             </div>
-          </aside>
 
-          {/* EVENTS LIST */}
-          <main className="w-full lg:w-3/4 space-y-6">
-            {events.map((event: any) => {
-              const details = event.eventDetails || {};
-              const isOfficial = details.isOfficial;
-              const dateObj = new Date(details.startDate);
-              const day = dateObj.getDate();
-              const month = dateObj.toLocaleString('default', { month: 'short' });
-              const year = dateObj.getFullYear();
-              const time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            <div className="grid gap-6 xl:grid-cols-4 md:grid-cols-2">
+              {featuredEvents.map((event) => (
+                <article key={event.id} className="border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-primary">
+                    <Star size={13} /> {event.eventDetails.eventType}
+                  </div>
+                  <h3 className="mt-4 line-clamp-2 text-xl font-black text-secondary">{event.title}</h3>
+                  <p className="mt-3 line-clamp-3 text-sm leading-7 text-gray-500">{event.excerpt}</p>
+                  <div className="mt-5 space-y-2 text-sm text-gray-500">
+                    <p className="flex items-center gap-2"><CalendarRange size={15} className="text-primary" /> {format(parseEventDate(event.eventDetails.startDate)!, "d MMMM yyyy", { locale: tr })}</p>
+                    <p className="flex items-center gap-2"><MapPin size={15} className="text-primary" /> {event.eventDetails.venue || event.city || "Online"}</p>
+                  </div>
+                  <Link href={`/ajanda/${event.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-secondary transition hover:text-primary">
+                    İncele <ChevronRight size={14} />
+                  </Link>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-              return (
-                <Link 
-                  href={`/ajanda/${event.slug}`} 
-                  key={event.id} 
-                  className={`group bg-white border border-gray-200 flex flex-col md:flex-row hover:shadow-lg transition-all duration-300 overflow-hidden relative block ${isOfficial ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-transparent hover:border-l-primary'}`}
-                >
-                   {/* Tarih */}
-                   <div className={`w-full md:w-32 bg-gray-50 flex flex-col items-center justify-center p-4 border-b md:border-b-0 md:border-r border-gray-100 shrink-0 ${isOfficial ? 'bg-red-50 text-red-600' : 'text-secondary group-hover:text-primary'}`}>
-                      <span className="text-4xl font-black tracking-tighter">{day}</span>
-                      <span className="text-sm font-bold uppercase tracking-widest">{month}</span>
-                      <span className="text-xs text-gray-400 mt-1">{year}</span>
-                   </div>
+        <div className="grid gap-8 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <EventFilters
+              currentFilters={{
+                view,
+                q,
+                type,
+                sector,
+                location,
+                from,
+                to,
+                sort,
+                priceMax,
+                month: monthValue,
+                date: selectedDate,
+              }}
+              eventTypes={eventTypes}
+              sectorOptions={matchedSectors.length > 0 ? matchedSectors : sectorCatalog}
+              locationOptions={locationOptions}
+              resultCount={filteredEvents.length}
+              hasViewParam={Boolean(viewParam)}
+            />
 
-                   {/* İçerik */}
-                   <div className="flex-1 p-6 flex flex-col justify-between">
-                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                         <div>
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                               <span className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wide border ${isOfficial ? 'bg-red-100 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                 {details.eventType}
-                               </span>
-                               {isOfficial && (
-                                 <span className="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase">
-                                   <AlertCircle size={10} /> Resmi Takvim
-                                 </span>
-                               )}
-                            </div>
-                            
-                            <h3 className="text-xl font-bold text-secondary mb-2 group-hover:text-primary transition-colors">
-                              {event.title}
-                            </h3>
-                            
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 font-medium uppercase tracking-wide mt-3">
-                               <span className="flex items-center gap-1"><Clock size={12}/> {time}</span>
-                               <span className="flex items-center gap-1">
-                                 {details.locationType === 'online' ? <Video size={12}/> : <MapPin size={12}/>} 
-                                 {details.venue || 'Online'}
-                               </span>
-                            </div>
-                         </div>
-                         
-                         {/* Görsel */}
-                         {!isOfficial && event.featuredImage?.node?.sourceUrl && (
-                           <div className="w-full md:w-32 h-24 bg-gray-200 shrink-0 border border-gray-200 overflow-hidden hidden md:block">
-                             <img src={event.featuredImage.node.sourceUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                           </div>
-                         )}
-                      </div>
-                   </div>
-                </Link>
-              );
-            })}
-          </main>
+            <section className="space-y-4 border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-gray-400">
+                <BellRing size={14} /> Arşiv / Son Etkinlikler
+              </p>
+              <div className="space-y-4">
+                {archiveEvents.slice(0, 5).map((event) => (
+                  <Link key={event.id} href={`/ajanda/${event.slug}`} className="block border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">
+                      {format(parseEventDate(event.eventDetails.startDate)!, "d MMM yyyy", { locale: tr })}
+                    </p>
+                    <p className="mt-2 text-sm font-bold leading-6 text-secondary transition hover:text-primary">{event.title}</p>
+                  </Link>
+                ))}
+                {archiveEvents.length === 0 ? (
+                  <p className="text-sm leading-7 text-gray-500">Henüz arşivde gösterilecek tamamlanmış etkinlik bulunmuyor.</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+
+          <div className="space-y-8">
+            {view !== "list" ? (
+              <EventCalendar
+                events={calendarEvents}
+                monthDate={monthDate}
+                selectedDate={selectedDate}
+                baseParams={baseParams}
+              />
+            ) : null}
+
+            <EventList
+              events={paginatedList}
+              currentPage={safePage}
+              totalPages={totalPages}
+              baseParams={baseParams}
+              title={selectedDayLabel ? `${selectedDayLabel} Etkinlikleri` : view === "list" ? "Tüm yaklaşan etkinlikler" : "Yaklaşan etkinlikler"}
+              description={
+                selectedDayLabel
+                  ? "Takvimde seçtiğiniz güne ait etkinlikler aşağıda listelenir."
+                  : view === "list"
+                  ? "Filtrelediğiniz ajanda kayıtlarını tarih, tip veya önem derecesine göre sıralanmış şekilde keşfedin."
+                  : "Takvim üzerinde işaretli günler arasından seçim yapabilir veya yaklaşan etkinlikleri aşağıdan inceleyebilirsiniz."
+              }
+            />
+          </div>
         </div>
       </div>
     </div>
