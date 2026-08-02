@@ -11,48 +11,53 @@ type FilterOption = {
 type MapFiltersProps = {
   locations: FilterOption[];
   sectors: FilterOption[];
-  selectedLocations: string[];
-  selectedSectors: string[];
+  selectedLocation?: string;
+  selectedSector?: string;
   verifiedOnly: boolean;
+  totalCount: number;
   visibleCount: number;
   onClear: () => void;
-  onLocationToggle: (slug: string) => void;
-  onSectorToggle: (slug: string) => void;
+  onLocationSelect: (slug?: string) => void;
+  onSectorSelect: (slug?: string) => void;
   onVerifiedToggle: () => void;
 };
 
-function CheckboxItem({
-  checked,
+function FilterItem({
+  active,
   count,
   label,
-  onChange,
+  onClick,
 }: {
-  checked: boolean;
+  active: boolean;
   count: number;
   label: string;
-  onChange: () => void;
+  onClick: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between border border-gray-200 px-3 py-2 text-xs text-secondary hover:border-primary">
-      <span className="inline-flex items-center gap-2">
-        <input checked={checked} className="size-3.5 accent-primary" onChange={onChange} type="checkbox" />
-        {label}
-      </span>
+    <button
+      className={`flex w-full items-center justify-between border px-3 py-2 text-left text-xs transition-colors ${
+        active ? "border-primary bg-orange-50 text-primary" : "border-gray-200 text-secondary hover:border-primary"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <span>{label}</span>
       <span className="text-[10px] text-gray-500">{count}</span>
-    </label>
+    </button>
   );
 }
 
 export default function MapFilters({
   locations,
   sectors,
-  selectedLocations,
-  selectedSectors,
+  selectedLocation,
+  selectedSector,
   verifiedOnly,
+  totalCount,
   visibleCount,
   onClear,
-  onLocationToggle,
-  onSectorToggle,
+  onLocationSelect,
+  onSectorSelect,
   onVerifiedToggle,
 }: MapFiltersProps) {
   return (
@@ -68,19 +73,19 @@ export default function MapFilters({
 
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Doğrulama</p>
-        <CheckboxItem checked={verifiedOnly} count={visibleCount} label="Sadece Onaylı" onChange={onVerifiedToggle} />
+        <FilterItem active={verifiedOnly} count={visibleCount} label="Sadece Onaylı" onClick={onVerifiedToggle} />
       </div>
 
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Sektör</p>
         <div className="space-y-2">
           {sectors.map((sector) => (
-            <CheckboxItem
-              checked={selectedSectors.includes(sector.slug)}
+            <FilterItem
+              active={selectedSector === sector.slug}
               count={sector.count}
               key={sector.slug}
               label={sector.name}
-              onChange={() => onSectorToggle(sector.slug)}
+              onClick={() => onSectorSelect(selectedSector === sector.slug ? undefined : sector.slug)}
             />
           ))}
         </div>
@@ -89,13 +94,19 @@ export default function MapFilters({
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Şehir</p>
         <div className="space-y-2">
+          <FilterItem
+            active={!selectedLocation}
+            count={totalCount}
+            label="Türkiye Geneli"
+            onClick={() => onLocationSelect(undefined)}
+          />
           {locations.map((location) => (
-            <CheckboxItem
-              checked={selectedLocations.includes(location.slug)}
+            <FilterItem
+              active={selectedLocation === location.slug}
               count={location.count}
               key={location.slug}
               label={location.name}
-              onChange={() => onLocationToggle(location.slug)}
+              onClick={() => onLocationSelect(selectedLocation === location.slug ? undefined : location.slug)}
             />
           ))}
         </div>

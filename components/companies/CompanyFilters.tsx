@@ -54,6 +54,7 @@ export default function CompanyFilters({
     ...(selectedVerified ? { verified: selectedVerified } : {}),
     ...(searchQuery ? { q: searchQuery } : {}),
   };
+  const totalLocationCount = locations.reduce((sum, location) => sum + location.count, 0);
 
   return (
     <aside className="space-y-6 border border-gray-200 bg-white p-6 shadow-sm">
@@ -110,6 +111,17 @@ export default function CompanyFilters({
       <div>
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Şehir</p>
         <div className="space-y-2">
+          <Link
+            className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
+              !selectedLocation
+                ? "border-primary bg-orange-50 text-primary"
+                : "border-gray-200 text-secondary hover:border-primary"
+            }`}
+            href={buildHref(currentParams, { location: undefined })}
+          >
+            <span>Türkiye Geneli</span>
+            <span className="text-xs text-gray-500">{totalLocationCount}</span>
+          </Link>
           {locations.map((location) => (
             <Link
               className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
@@ -126,6 +138,11 @@ export default function CompanyFilters({
               <span className="text-xs text-gray-500">{location.count}</span>
             </Link>
           ))}
+          {!locations.length ? (
+            <p className="border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-500">
+              Şehir verisi bulunamadı. Türkiye geneli sonuçları gösteriliyor.
+            </p>
+          ) : null}
         </div>
       </div>
 

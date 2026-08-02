@@ -12,8 +12,14 @@ export type MapCompany = {
     email?: string | null;
     phone?: string | null;
     address?: string | null;
+    website?: string | null;
     mapLat?: string | null;
     mapLng?: string | null;
+  } | null;
+  featuredImage?: {
+    node?: {
+      sourceUrl?: string | null;
+    } | null;
   } | null;
   sectors?: {
     nodes?: Array<TaxonomyNode | null> | null;

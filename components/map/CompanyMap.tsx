@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import L, { divIcon } from "leaflet";
+import { usePathname, useRouter } from "next/navigation";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import MapControls from "@/components/map/MapControls";
@@ -12,6 +13,11 @@ import type { MapCompany, MappedCompany } from "@/components/map/types";
 
 type CompanyMapProps = {
   companies: MapCompany[];
+  initialFilters?: {
+    location?: string;
+    sector?: string;
+    verified?: boolean;
+  };
 };
 
 type FilterOption = {
@@ -137,14 +143,12 @@ function createMarkerIcon(color?: string) {
   });
 }
 
-function toggleValue(values: string[], value: string) {
-  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-export default function CompanyMap({ companies }: CompanyMapProps) {
-  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
+export default function CompanyMap({ companies, initialFilters }: CompanyMapProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [selectedSector, setSelectedSector] = useState(initialFilters?.sector ?? "");
+  const [selectedLocation, setSelectedLocation] = useState(initialFilters?.location ?? "");
+  const [verifiedOnly, setVerifiedOnly] = useState(Boolean(initialFilters?.verified));
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const mappableCompanies = useMemo(() => {
@@ -174,16 +178,13 @@ export default function CompanyMap({ companies }: CompanyMapProps) {
       const locationSlugs = (company.locations?.nodes ?? [])
         .map((item) => item?.slug)
         .filter((slug): slug is string => Boolean(slug));
-
-      const matchesSector =
-        !selectedSectors.length || sectorSlugs.some((slug) => selectedSectors.includes(slug));
-      const matchesLocation =
-        !selectedLocations.length || locationSlugs.some((slug) => selectedLocations.includes(slug));
+      const matchesSector = !selectedSector || sectorSlugs.includes(selectedSector);
+      const matchesLocation = !selectedLocation || locationSlugs.includes(selectedLocation);
       const matchesVerified = !verifiedOnly || Boolean(company.companyDetails?.isVerified);
 
       return matchesSector && matchesLocation && matchesVerified;
     });
-  }, [mappableCompanies, selectedLocations, selectedSectors, verifiedOnly]);
+  }, [mappableCompanies, selectedLocation, selectedSector, verifiedOnly]);
 
   const points = useMemo<Array<[number, number]>>(
     () => filteredCompanies.map((company) => [company.lat, company.lng]),
@@ -200,22 +201,42 @@ export default function CompanyMap({ companies }: CompanyMapProps) {
     [sectorColorMap, sectorOptions],
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (selectedSector) {
+      params.set("sector", selectedSector);
+    }
+
+    if (selectedLocation) {
+      params.set("location", selectedLocation);
+    }
+
+    if (verifiedOnly) {
+      params.set("verified", "true");
+    }
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, selectedLocation, selectedSector, verifiedOnly]);
+
   return (
     <div className="grid min-h-[70vh] gap-0 border border-gray-200 bg-white lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="hidden lg:block">
         <MapFilters
           locations={locationOptions}
           onClear={() => {
-            setSelectedLocations([]);
-            setSelectedSectors([]);
+            setSelectedLocation("");
+            setSelectedSector("");
             setVerifiedOnly(false);
           }}
-          onLocationToggle={(slug) => setSelectedLocations((current) => toggleValue(current, slug))}
-          onSectorToggle={(slug) => setSelectedSectors((current) => toggleValue(current, slug))}
+          onLocationSelect={(slug) => setSelectedLocation(slug ?? "")}
+          onSectorSelect={(slug) => setSelectedSector(slug ?? "")}
           onVerifiedToggle={() => setVerifiedOnly((current) => !current)}
           sectors={sectorOptions}
-          selectedLocations={selectedLocations}
-          selectedSectors={selectedSectors}
+          selectedLocation={selectedLocation}
+          selectedSector={selectedSector}
+          totalCount={mappableCompanies.length}
           verifiedOnly={verifiedOnly}
           visibleCount={filteredCompanies.length}
         />
@@ -252,6 +273,12 @@ export default function CompanyMap({ companies }: CompanyMapProps) {
 
         <MapLegend items={legendItems} />
 
+        {!filteredCompanies.length ? (
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[500] border border-gray-200 bg-white/95 px-4 py-3 text-sm text-secondary shadow-lg lg:left-[336px]">
+            Seçili filtrelerle eşleşen konum bulunamadı.
+          </div>
+        ) : null}
+
         <div className="absolute left-3 top-3 z-[500] lg:hidden">
           <button
             className="border border-gray-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-secondary shadow-lg"
@@ -267,16 +294,17 @@ export default function CompanyMap({ companies }: CompanyMapProps) {
             <MapFilters
               locations={locationOptions}
               onClear={() => {
-                setSelectedLocations([]);
-                setSelectedSectors([]);
+                setSelectedLocation("");
+                setSelectedSector("");
                 setVerifiedOnly(false);
               }}
-              onLocationToggle={(slug) => setSelectedLocations((current) => toggleValue(current, slug))}
-              onSectorToggle={(slug) => setSelectedSectors((current) => toggleValue(current, slug))}
+              onLocationSelect={(slug) => setSelectedLocation(slug ?? "")}
+              onSectorSelect={(slug) => setSelectedSector(slug ?? "")}
               onVerifiedToggle={() => setVerifiedOnly((current) => !current)}
               sectors={sectorOptions}
-              selectedLocations={selectedLocations}
-              selectedSectors={selectedSectors}
+              selectedLocation={selectedLocation}
+              selectedSector={selectedSector}
+              totalCount={mappableCompanies.length}
               verifiedOnly={verifiedOnly}
               visibleCount={filteredCompanies.length}
             />
