@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Calendar, Clock, User } from "lucide-react";
 
@@ -66,10 +67,12 @@ export default function NewsCard({ post }: NewsCardProps) {
 
   return (
     <article className="group flex h-full flex-col overflow-hidden border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-xl">
-      <Link className="block overflow-hidden bg-gray-100" href={`/haber/${slug}`}>
-        <img
+      <Link className="relative block h-56 overflow-hidden bg-gray-100" href={`/haber/${slug}`}>
+        <Image
           alt={title}
-          className="h-56 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          sizes="(min-width: 1280px) 24rem, (min-width: 768px) 50vw, 100vw"
           src={imageUrl || `https://placehold.co/960x640/f3f4f6/111827?text=${encodeURIComponent(title)}`}
         />
       </Link>

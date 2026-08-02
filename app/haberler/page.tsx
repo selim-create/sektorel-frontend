@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Calendar, ChevronRight, Search, TrendingUp, User } from "lucide-react";
 import FallbackUI from "@/components/error/FallbackUI";
@@ -262,10 +263,15 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
           <section className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
             <article className="group overflow-hidden border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:border-primary hover:shadow-xl">
               <div className="grid h-full md:grid-cols-2">
-                <Link className="block overflow-hidden bg-gray-100" href={`/haber/${featuredPost.slug}`}>
-                  <img
+                <Link
+                  className="relative block min-h-[280px] overflow-hidden bg-gray-100"
+                  href={`/haber/${featuredPost.slug}`}
+                >
+                  <Image
                     alt={featuredPost.title || "Öne çıkan haber"}
-                    className="h-full min-h-[280px] w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    fill
+                    sizes="(min-width: 1024px) 50vw, 100vw"
                     src={
                       featuredPost.featuredImage?.node?.sourceUrl ||
                       `https://placehold.co/1200x900/111827/ffffff?text=${encodeURIComponent(
