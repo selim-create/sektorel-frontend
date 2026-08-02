@@ -116,6 +116,51 @@ export const GET_COMPANIES_PAGINATED = gql`
   }
 `;
 
+export const GET_ALL_LOCATIONS = gql`
+  query GetAllLocations {
+    locations(first: 100, where: { orderby: COUNT, order: DESC, hideEmpty: true }) {
+      nodes {
+        id
+        name
+        slug
+        count
+      }
+    }
+  }
+`;
+
+export const GET_COMPANIES_WITH_MAP = gql`
+  query GetCompaniesWithMap {
+    companies(first: 500, where: { orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        companyDetails {
+          isVerified
+          email
+          phone
+          address
+          mapLat
+          mapLng
+        }
+        sectors {
+          nodes {
+            name
+            slug
+          }
+        }
+        locations {
+          nodes {
+            name
+            slug
+          }
+        }
+      }
+    }
+  }
+`;
+
 // --- ETKİNLİKLER (AJANDA) ---
 export const GET_EVENTS = gql`
   query GetEvents {

@@ -7,7 +7,7 @@ import CompanySearch from "@/components/companies/CompanySearch";
 import CompanySort from "@/components/companies/CompanySort";
 import FallbackUI from "@/components/error/FallbackUI";
 import { queryWithFallback } from "@/lib/graphql-client";
-import { GET_COMPANIES_PAGINATED } from "@/lib/queries";
+import { GET_ALL_LOCATIONS, GET_COMPANIES_PAGINATED } from "@/lib/queries";
 
 export const metadata: Metadata = {
   title: "Firma Rehberi | Sektörel Ajanda",
@@ -70,6 +70,17 @@ type QueryData = {
   };
 };
 
+type LocationsData = {
+  locations: {
+    nodes: Array<{
+      id?: string | null;
+      name?: string | null;
+      slug?: string | null;
+      count?: number | null;
+    } | null>;
+  };
+};
+
 const EMPTY_DATA: QueryData = {
   companies: {
     nodes: [],
@@ -77,6 +88,12 @@ const EMPTY_DATA: QueryData = {
       endCursor: null,
       hasNextPage: false,
     },
+  },
+};
+
+const EMPTY_LOCATIONS: LocationsData = {
+  locations: {
+    nodes: [],
   },
 };
 
@@ -103,6 +120,17 @@ function getFilterOptions(companies: Company[], key: "sectors" | "locations") {
   });
 
   return [...map.values()].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "tr"));
+}
+
+function getLocationOptions(nodes: LocationsData["locations"]["nodes"]) {
+  return nodes
+    .filter((node): node is NonNullable<(typeof nodes)[number]> => Boolean(node?.slug && node.name))
+    .map((node) => ({
+      slug: node.slug as string,
+      name: node.name as string,
+      count: Number(node.count ?? 0),
+    }))
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "tr"));
 }
 
 function sortCompanies(companies: Company[], sort: string) {
@@ -140,22 +168,37 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const verified = getSingleValue(resolved.verified).trim();
   const after = getSingleValue(resolved.after).trim();
 
-  const { data, hasError } = await queryWithFallback<QueryData, { first: number; after?: string; search?: string }>(
-    {
-      query: GET_COMPANIES_PAGINATED,
-      variables: {
-        first: 50,
-        ...(after ? { after } : {}),
-        ...(q ? { search: q } : {}),
-      },
-    },
-    EMPTY_DATA,
-    "companies paginated listing",
-  );
+  const [{ data, hasError: hasCompanyError }, { data: allLocationsData, hasError: hasLocationError }] =
+    await Promise.all([
+      queryWithFallback<QueryData, { first: number; after?: string; search?: string }>(
+        {
+          query: GET_COMPANIES_PAGINATED,
+          variables: {
+            first: 50,
+            ...(after ? { after } : {}),
+            ...(q ? { search: q } : {}),
+          },
+        },
+        EMPTY_DATA,
+        "companies paginated listing",
+      ),
+      queryWithFallback<LocationsData>(
+        {
+          query: GET_ALL_LOCATIONS,
+        },
+        EMPTY_LOCATIONS,
+        "all locations listing",
+      ),
+    ]);
+
+  const hasError = hasCompanyError || hasLocationError;
+
+  const allLocations = getLocationOptions(allLocationsData?.locations?.nodes ?? []);
 
   const companies = (data?.companies?.nodes ?? []).filter(
     (company): company is Company => Boolean(company?.id && company.slug?.trim()),
   );
+  const locationsToDisplay = allLocations.length ? allLocations : getFilterOptions(companies, "locations");
 
   if (hasError && companies.length === 0) {
     return (
@@ -248,7 +291,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
           <CompanyFilters
             activeFilterCount={activeFilterCount}
-            locations={getFilterOptions(companies, "locations")}
+            locations={locationsToDisplay}
             searchQuery={q}
             sectors={getFilterOptions(companies, "sectors")}
             selectedLocation={location}

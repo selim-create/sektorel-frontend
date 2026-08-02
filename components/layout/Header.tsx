@@ -323,7 +323,7 @@ export default function Header() {
               İK & Kariyer
             </Link>
             
-            <Link href="/firmalar" className="ml-auto flex items-center gap-2 text-gray-500 hover:text-secondary font-bold text-xs normal-case bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200 hover:border-gray-300 transition-all">
+            <Link href="/harita" className="ml-auto flex items-center gap-2 text-gray-500 hover:text-secondary font-bold text-xs normal-case bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200 hover:border-gray-300 transition-all">
               <MapPin size={14} /> Haritada Keşfet
             </Link>
           </nav>
@@ -367,6 +367,7 @@ export default function Header() {
             <p className="text-xs font-bold text-gray-400 uppercase mb-2">Keşfet</p>
             <Link href="/sektorler" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Sektörler</Link>
             <Link href="/firmalar" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Firmalar</Link>
+            <Link href="/harita" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Harita</Link>
             <Link href="/firsatlar" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Ticari Fırsatlar</Link>
             <Link href="/ajanda" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Etkinlikler</Link>
             <Link href="/haberler" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Haberler</Link>
