@@ -6,6 +6,8 @@ export default function OwnedEventsPage() {
       title="Etkinliklerim"
       description="Oluşturduğunuz etkinlik kayıtlarını ve yayın durumlarını buradan takip edin."
       types={["event"]}
+      createHref="/ajanda/etkinlik-ekle"
+      createLabel="Etkinlik Ekle"
     />
   );
 }
