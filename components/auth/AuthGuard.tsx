@@ -1,21 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { hasSession } from "@/lib/auth";
+import { usePathname, useRouter } from "next/navigation";
+import { ensureSession, subscribeToAuthChanges } from "@/lib/auth";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!hasSession()) {
-      router.replace("/giris?redirect=/hesabim");
-      return;
-    }
+    let active = true;
 
-    setReady(true);
-  }, [router]);
+    const verifySession = async () => {
+      setReady(false);
+      const authenticated = await ensureSession();
+
+      if (!active) return;
+
+      if (!authenticated) {
+        const redirect = pathname || "/hesabim";
+        router.replace(`/giris?redirect=${encodeURIComponent(redirect)}`);
+        return;
+      }
+
+      setReady(true);
+    };
+
+    void verifySession();
+
+    const unsubscribe = subscribeToAuthChanges(() => {
+      void verifySession();
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [pathname, router]);
 
   if (!ready) {
     return (
