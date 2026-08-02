@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, X } from "lucide-react";
 import Link from "next/link";
 
@@ -38,7 +38,17 @@ function loadRecentSearches(): string[] {
 }
 
 export default function RecentSearches() {
-  const [searches, setSearches] = useState<string[]>(() => loadRecentSearches());
+  const [mounted, setMounted] = useState(false);
+  const [searches, setSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setMounted(true);
+      setSearches(loadRecentSearches());
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   function removeSearch(term: string) {
     try {
@@ -53,7 +63,7 @@ export default function RecentSearches() {
     }
   }
 
-  if (searches.length === 0) return null;
+  if (!mounted || searches.length === 0) return null;
 
   return (
     <div className="border border-gray-200 bg-white p-5 shadow-sm">
