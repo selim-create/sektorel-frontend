@@ -79,7 +79,16 @@ export function getSessionUser(): SessionUser | null {
 }
 
 export function hasSession() {
-  return Boolean(getAccessToken() && getRefreshToken() && getSessionUser());
+  if (typeof window === "undefined") return false;
+
+  // Header'ın mevcut çıkış butonu legacy anahtarları temizlediği için bu
+  // anahtar aynı zamanda geçici oturum bayrağı olarak kullanılır.
+  return Boolean(
+    localStorage.getItem(LEGACY_ACCESS_TOKEN_KEY) &&
+    getAccessToken() &&
+    getRefreshToken() &&
+    getSessionUser(),
+  );
 }
 
 export function clearSession() {
