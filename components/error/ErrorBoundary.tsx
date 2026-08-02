@@ -23,7 +23,13 @@ export default class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logGraphQLError("client boundary", { error, errorInfo });
+    logGraphQLError("client boundary", error);
+    if (errorInfo.componentStack) {
+      console.error(
+        "[GraphQL] client boundary - Component Stack:",
+        errorInfo.componentStack,
+      );
+    }
   }
 
   handleRetry = () => {
