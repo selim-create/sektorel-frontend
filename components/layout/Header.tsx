@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -63,14 +63,18 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<{name: string} | null>(null);
+  const [desktopSearchQuery, setDesktopSearchQuery] = useState("");
+  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
+  const [isDesktopSearchFocused, setIsDesktopSearchFocused] = useState(false);
   
   // Sektörler Mega Menü Kontrolü
   const [isMegaMenuOpen, setIsMegaMenuOpen] = useState(false);
+  const desktopSearchRef = useRef<HTMLInputElement>(null);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
 
   // Auth Durumunu Kontrol Et
   useEffect(() => {
-    // localStorage sadece client-side'da çalışır
-    if (typeof window !== "undefined") {
+    const timeoutId = window.setTimeout(() => {
       const token = localStorage.getItem("authToken");
       const userData = localStorage.getItem("user");
       
@@ -81,8 +85,13 @@ export default function Header() {
         } catch (e) {
           console.error("User data parse error", e);
         }
+      } else {
+        setIsLoggedIn(false);
+        setUser(null);
       }
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [pathname]); // Sayfa değişiminde de kontrol et
 
   const handleLogout = () => {
@@ -96,9 +105,52 @@ export default function Header() {
 
   // Sayfa değişince mobil menüyü kapat
   useEffect(() => {
-    setIsMobileMenuOpen(false);
-    setIsMegaMenuOpen(false);
+    const timeoutId = window.setTimeout(() => {
+      setIsMobileMenuOpen(false);
+      setIsMegaMenuOpen(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [pathname]);
+
+  useEffect(() => {
+    function handleKeydown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+
+        if (window.innerWidth >= 1024) {
+          desktopSearchRef.current?.focus();
+          return;
+        }
+
+        setIsMobileMenuOpen(true);
+        window.setTimeout(() => mobileSearchRef.current?.focus(), 0);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  }, []);
+
+  const submitSearch = (rawQuery: string) => {
+    const query = rawQuery.trim();
+    if (!query) return;
+
+    setDesktopSearchQuery("");
+    setMobileSearchQuery("");
+    setIsMobileMenuOpen(false);
+    router.push(`/ara?q=${encodeURIComponent(query)}`);
+  };
+
+  const handleDesktopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    submitSearch(desktopSearchQuery);
+  };
+
+  const handleMobileSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    submitSearch(mobileSearchQuery);
+  };
 
   return (
     <header className="flex flex-col w-full border-b border-gray-200 bg-white sticky top-0 z-50 font-sans shadow-sm">
@@ -106,7 +158,7 @@ export default function Header() {
       {/* 1. TOP BAR (Siyah İnce Bant) */}
       <div className="bg-secondary text-gray-300 text-[11px] h-9 flex items-center justify-between px-4 lg:px-12 tracking-wide transition-colors relative z-50">
         <div className="hidden md:flex gap-4 items-center">
-          <span className="opacity-80">Türkiye'nin En Kapsamlı Sektörel Ajandası</span>
+          <span className="opacity-80">Türkiye&#39;nin En Kapsamlı Sektörel Ajandası</span>
           <span className="w-px h-3 bg-gray-700"></span>
           <Link href="/hakkimizda" className="hover:text-white transition">Hakkımızda</Link>
           <Link href="/iletisim" className="hover:text-white transition">İletişim</Link>
@@ -154,21 +206,28 @@ export default function Header() {
         </Link>
 
         {/* ORTA: ARAMA (Desktop) */}
-        <div className="hidden lg:flex flex-1 max-w-2xl relative group">
+        <form onSubmit={handleDesktopSearchSubmit} className="hidden lg:flex flex-1 max-w-2xl relative group">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             <Search className="h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
           </div>
-          <input 
-            type="text" 
-            placeholder="Firma, sektör, haber veya etkinlik ara..." 
-            className="w-full pl-10 pr-32 py-3 bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-none placeholder:text-gray-400"
+          <input
+            ref={desktopSearchRef}
+            type="search"
+            value={desktopSearchQuery}
+            onChange={(event) => setDesktopSearchQuery(event.target.value)}
+            onFocus={() => setIsDesktopSearchFocused(true)}
+            onBlur={() => setIsDesktopSearchFocused(false)}
+            placeholder="Firma, sektör, haber veya etkinlik ara..."
+            className={`w-full pl-10 pr-32 py-3 bg-gray-50 border text-sm focus:outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-none placeholder:text-gray-400 ${
+              isDesktopSearchFocused ? "border-primary bg-white" : "border-gray-200"
+            }`}
           />
           <div className="absolute inset-y-1 right-1">
-            <button className="h-full px-6 bg-secondary text-white text-xs font-bold hover:bg-black transition-colors uppercase tracking-wider">
+            <button type="submit" className="h-full px-6 bg-secondary text-white text-xs font-bold hover:bg-black transition-colors uppercase tracking-wider">
               ARA
             </button>
           </div>
-        </div>
+        </form>
 
         {/* SAĞ: CTA (Firma Ekle) */}
         <div className="hidden lg:flex items-center gap-3">
@@ -287,10 +346,23 @@ export default function Header() {
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             
             {/* Arama (Mobil) */}
-            <div className="relative mb-6">
-               <input type="text" placeholder="Ara..." className="w-full bg-gray-50 border border-gray-200 p-3 pl-10 text-sm rounded-none focus:border-primary outline-none"/>
+            <form onSubmit={handleMobileSearchSubmit} className="relative mb-6">
+               <input
+                 ref={mobileSearchRef}
+                 type="search"
+                 value={mobileSearchQuery}
+                 onChange={(event) => setMobileSearchQuery(event.target.value)}
+                 placeholder="Ara..."
+                 className="w-full bg-gray-50 border border-gray-200 p-3 pl-10 pr-20 text-sm rounded-none focus:border-primary outline-none"
+               />
                <Search className="absolute left-3 top-3.5 text-gray-400" size={16}/>
-            </div>
+               <button
+                 type="submit"
+                 className="absolute inset-y-1 right-1 px-4 bg-secondary text-white text-xs font-bold uppercase tracking-wider"
+               >
+                 Ara
+               </button>
+            </form>
 
             <p className="text-xs font-bold text-gray-400 uppercase mb-2">Keşfet</p>
             <Link href="/sektorler" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Sektörler</Link>
