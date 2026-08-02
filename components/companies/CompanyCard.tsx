@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import VerificationBadge from "@/components/companies/VerificationBadge";
+import CompanyAvatar from "@/components/common/CompanyAvatar";
 
 type TaxonomyNode = {
   name?: string | null;
@@ -46,21 +47,23 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
   const slug = company.slug?.trim() || "";
   const details = company.companyDetails || {};
   const locationName = company.locations?.nodes?.find((item) => item?.name)?.name || "Türkiye";
-  const imageSrc =
-    company.featuredImage?.node?.sourceUrl ||
-    `https://placehold.co/800x600/111827/ffffff?text=${encodeURIComponent(title)}`;
+  const imageSrc = company.featuredImage?.node?.sourceUrl || null;
 
   return (
     <article className="group flex h-full flex-col overflow-hidden border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-xl">
       <Link className="relative block aspect-[16/10] overflow-hidden bg-gray-100" href={`/firma/${slug}`}>
-        <Image
-          alt={title}
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          fill
-          loading="lazy"
-          sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
-          src={imageSrc}
-        />
+        {imageSrc ? (
+          <Image
+            alt={title}
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            fill
+            loading="lazy"
+            sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+            src={imageSrc}
+          />
+        ) : (
+          <CompanyAvatar name={title} />
+        )}
         <div className="absolute left-3 top-3">
           <VerificationBadge featured={featured} isVerified={details.isVerified} />
         </div>
