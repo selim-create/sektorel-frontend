@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   MapPin, 
@@ -54,15 +55,24 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ slu
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data } = await getClient().query({
+  const { data, hasError } = await queryWithFallback({
     query: GET_LEAD_DATA,
     variables: { slug }
-  });
+  }, { lead: null }, `lead detail ${slug}`);
 
   const lead = data?.lead;
 
   if (!lead) {
-    return <div className="p-20 text-center">İlan bulunamadı.</div>;
+    return hasError ? (
+      <FallbackUI
+        title="İlan verisi yüklenemedi"
+        message="İlan detayları şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Fırsatlara dön"
+        href="/firsatlar"
+      />
+    ) : (
+      <div className="p-20 text-center">İlan bulunamadı.</div>
+    );
   }
 
   const details = lead.leadDetails || {};

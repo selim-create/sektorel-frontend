@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_JOB_DATA } from "@/lib/queries";
 import { 
   MapPin, 
@@ -15,15 +16,22 @@ import {
 export default async function JobDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const { data } = await getClient().query<any>({
+  const { data, hasError } = await queryWithFallback<any>({
     query: GET_JOB_DATA,
     variables: { slug }
-  });
+  }, { job: null }, `job detail ${slug}`);
 
   const job = data?.job;
 
   if (!job) {
-    return (
+    return hasError ? (
+      <FallbackUI
+        title="İlan verisi yüklenemedi"
+        message="Kariyer ilanı şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="İlanlara dön"
+        href="/kariyer"
+      />
+    ) : (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">İlan Bulunamadı</h1>

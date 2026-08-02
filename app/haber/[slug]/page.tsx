@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { gql } from "@apollo/client";
 import { 
   Calendar, 
@@ -76,17 +77,24 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
   const { slug } = await params;
 
   // Veriyi Çek
-  const { data } = await getClient().query<any>({
+  const { data, hasError } = await queryWithFallback<any>({
     query: GET_POST_DATA,
     variables: { slug }
-  });
+  }, { post: null, posts: { nodes: [] } }, `news detail ${slug}`);
 
   const post = data?.post;
   // Sidebar için mevcut haberi filtreleyerek diğerlerini alalım
-  const relatedPosts = data?.posts?.nodes.filter((p: any) => p.slug !== slug).slice(0, 3) || [];
+  const relatedPosts = data?.posts?.nodes?.filter((p: any) => p.slug !== slug).slice(0, 3) || [];
 
   if (!post) {
-    return (
+    return hasError ? (
+      <FallbackUI
+        title="Haber verisi yüklenemedi"
+        message="Haber detayları şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+        actionLabel="Haberlere dön"
+        href="/haberler"
+      />
+    ) : (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Haber Bulunamadı</h1>

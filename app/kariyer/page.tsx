@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_JOBS } from "@/lib/queries";
 import { 
   Briefcase, 
@@ -17,7 +17,7 @@ import {
 export const revalidate = 60;
 
 export default async function CareerPage() {
-  const { data } = await getClient().query<any>({ query: GET_JOBS });
+  const { data } = await queryWithFallback<any>({ query: GET_JOBS }, { jobs: { nodes: [] } }, "jobs listing");
   const jobs = data?.jobs?.nodes || [];
 
   return (

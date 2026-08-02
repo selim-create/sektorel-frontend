@@ -1,33 +1,49 @@
 "use client";
 
-import { HttpLink } from "@apollo/client";
+import { ApolloLink, HttpLink } from "@apollo/client";
 import {
   ApolloNextAppProvider,
   NextSSRApolloClient,
   NextSSRInMemoryCache,
   SSRMultipartLink,
 } from "@apollo/experimental-nextjs-app-support/ssr";
+import ErrorBoundary from "@/components/error/ErrorBoundary";
+import { createApolloErrorLink, GRAPHQL_ENDPOINT } from "@/lib/error-handler";
 
 function makeClient() {
   const httpLink = new HttpLink({
-    uri: process.env.NEXT_PUBLIC_WORDPRESS_API_URL || "http://localhost/graphql",
+    uri: GRAPHQL_ENDPOINT,
   });
 
   return new NextSSRApolloClient({
     cache: new NextSSRInMemoryCache(),
+    defaultOptions: {
+      query: {
+        errorPolicy: "all",
+      },
+      watchQuery: {
+        errorPolicy: "all",
+      },
+    },
     link:
       typeof window === "undefined"
-        ? new SSRMultipartLink({
-            stripDefer: true,
-          }).concat(httpLink)
-        : httpLink,
+        ? ApolloLink.from([
+            createApolloErrorLink("ssr"),
+            new SSRMultipartLink({
+              stripDefer: true,
+            }),
+            httpLink,
+          ])
+        : ApolloLink.from([createApolloErrorLink("client"), httpLink]),
   });
 }
 
 export function ApolloWrapper({ children }: React.PropsWithChildren) {
   return (
-    <ApolloNextAppProvider makeClient={makeClient}>
-      {children}
-    </ApolloNextAppProvider>
+    <ErrorBoundary>
+      <ApolloNextAppProvider makeClient={makeClient}>
+        {children}
+      </ApolloNextAppProvider>
+    </ErrorBoundary>
   );
 }

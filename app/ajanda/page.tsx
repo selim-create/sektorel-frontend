@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_EVENTS } from "@/lib/queries";
 import { 
   Calendar, MapPin, Clock, Filter, Search, ChevronRight, 
@@ -9,7 +9,7 @@ import {
 export const revalidate = 60;
 
 export default async function AgendaPage() {
-  const { data } = await getClient().query<any>({ query: GET_EVENTS });
+  const { data } = await queryWithFallback<any>({ query: GET_EVENTS }, { events: { nodes: [] } }, "agenda listing");
   const events = data?.events?.nodes || [];
 
   return (

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getClient } from "@/lib/graphql-client";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
 import { GET_ALL_SECTORS, GET_COMPANIES, GET_EVENTS } from "@/lib/queries";
 import { 
   Building2, 
@@ -20,15 +21,31 @@ import * as LucideIcons from "lucide-react";
 export const revalidate = 60; // Her 60 saniyede bir sayfayı yenile (ISR)
 
 export default async function Home() {
-  // GraphQL'den verileri paralel olarak çekiyoruz
-  // Not: TypeScript hatasını önlemek için query<any> kullanıyoruz.
-  const { data: sectorData } = await getClient().query<any>({ query: GET_ALL_SECTORS });
-  const { data: companyData } = await getClient().query<any>({ query: GET_COMPANIES });
-  const { data: eventData } = await getClient().query<any>({ query: GET_EVENTS });
+  const [
+    { data: sectorData, hasError: sectorError },
+    { data: companyData, hasError: companyError },
+    { data: eventData, hasError: eventError },
+  ] = await Promise.all([
+    queryWithFallback<any>({ query: GET_ALL_SECTORS }, { sectors: { nodes: [] } }, "homepage sectors"),
+    queryWithFallback<any>({ query: GET_COMPANIES }, { companies: { nodes: [] } }, "homepage companies"),
+    queryWithFallback<any>({ query: GET_EVENTS }, { events: { nodes: [] } }, "homepage events"),
+  ]);
 
   const sectors = sectorData?.sectors?.nodes || [];
   const companies = companyData?.companies?.nodes || [];
   const events = eventData?.events?.nodes || [];
+  const hasGraphQLError = sectorError || companyError || eventError;
+
+  if (hasGraphQLError && !sectors.length && !companies.length && !events.length) {
+    return (
+      <FallbackUI
+        title="İçerikler şu anda yüklenemedi"
+        message="Sektörel veriler geçici olarak alınamıyor. Lütfen kısa süre sonra tekrar deneyin."
+        actionLabel="Ana sayfaya dön"
+        href="/"
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-16 pb-20">
@@ -65,6 +82,11 @@ export default async function Home() {
       </section>
 
       <div className="container mx-auto px-4 md:px-8 space-y-20">
+        {hasGraphQLError ? (
+          <div className="border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-700">
+            Bazı içerikler geçici olarak yüklenemedi. Sayfa mevcut verilerle gösteriliyor.
+          </div>
+        ) : null}
         
         {/* 2. SEKTÖRLER (Dynamic Data) */}
         <section>
@@ -123,8 +145,8 @@ export default async function Home() {
                     <div className="w-16 h-16 border border-gray-100 bg-gray-50 p-2 flex items-center justify-center">
                       {/* Logo yoksa Placeholder */}
                       <img 
-                        src={company.companyDetails?.coverImage || `https://placehold.co/100x100?text=${company.title.substring(0,2)}`}
-                        alt={company.title} 
+                        src={company.companyDetails?.coverImage || `https://placehold.co/100x100?text=${(company.title || "FI").substring(0,2)}`}
+                        alt={company.title || "Firma"} 
                         className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500" 
                       />
                     </div>
@@ -174,9 +196,9 @@ export default async function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {events.map((event: any) => {
                // Tarih formatlama
-               const dateObj = new Date(event.eventDetails?.startDate);
-               const day = dateObj.getDate();
-               const month = dateObj.toLocaleString('default', { month: 'short' });
+              const dateObj = event.eventDetails?.startDate ? new Date(event.eventDetails.startDate) : null;
+              const day = dateObj ? dateObj.getDate() : "--";
+              const month = dateObj ? dateObj.toLocaleString('default', { month: 'short' }) : "---";
 
                return (
                 <article key={event.id} className="group cursor-pointer bg-white border border-gray-200 p-0 hover:shadow-lg transition-all">
