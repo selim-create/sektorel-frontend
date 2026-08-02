@@ -20,6 +20,17 @@ type RefreshMutationResponse = {
   errors?: Array<{ message?: string }>;
 };
 
+type SessionProfileResponse = {
+  data?: {
+    sektorelSession?: {
+      userId?: number | null;
+      displayName?: string | null;
+      email?: string | null;
+    } | null;
+  };
+  errors?: Array<{ message?: string }>;
+};
+
 const ACCESS_TOKEN_KEY = "sektorel.accessToken";
 const REFRESH_TOKEN_KEY = "sektorel.refreshToken";
 const USER_KEY = "sektorel.user";
@@ -72,25 +83,35 @@ export function isAccessTokenValid(
 
 function storeAccessToken(token: string) {
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-
-  // Eski sürümden kalmış kalıcı canonical access token'ı temizle.
   localStorage.removeItem(ACCESS_TOKEN_KEY);
-
-  // Header henüz bu anahtarı okuduğu için geçici olarak güncel tutulur.
   localStorage.setItem(LEGACY_ACCESS_TOKEN_KEY, token);
+}
+
+function storeSessionUser(user: SessionUser) {
+  const normalizedUser = normalizeUser(user);
+  localStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+  localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(normalizedUser));
+  emitAuthChanged();
+  return normalizedUser;
 }
 
 export function saveSession(authToken: string, refreshToken: string, user: SessionUser) {
   if (typeof window === "undefined") return;
 
-  const normalizedUser = normalizeUser(user);
-
   storeAccessToken(authToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  localStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
-  localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(normalizedUser));
+  storeSessionUser(user);
+}
 
-  emitAuthChanged();
+export function updateSessionUser(user: SessionUser) {
+  if (typeof window === "undefined") return null;
+
+  const current = getSessionUser();
+  return storeSessionUser({
+    id: user.id || current?.id || "",
+    name: user.name || current?.name,
+    email: user.email || current?.email,
+  });
 }
 
 export function updateSessionTokens(authToken: string, refreshToken: string) {
@@ -226,6 +247,51 @@ export async function getValidAccessToken() {
   if (isAccessTokenValid(token)) return token;
 
   return refreshAccessToken();
+}
+
+export async function hydrateSessionUser(accessToken?: string | null) {
+  if (typeof window === "undefined") return null;
+
+  const token = accessToken || (await getValidAccessToken());
+  if (!token) return null;
+
+  try {
+    const response = await fetch(GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/graphql-response+json, application/json;q=0.9",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        operationName: "HydrateSektorelSessionUser",
+        query: `
+          query HydrateSektorelSessionUser {
+            sektorelSession {
+              userId
+              displayName
+              email
+            }
+          }
+        `,
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as SessionProfileResponse;
+    const profile = payload.data?.sektorelSession;
+    if (!profile?.userId) return null;
+
+    return updateSessionUser({
+      id: String(profile.userId),
+      name: profile.displayName,
+      email: profile.email,
+    });
+  } catch (error) {
+    console.warn("Kullanıcı oturum bilgisi güncellenemedi.", error);
+    return null;
+  }
 }
 
 export async function ensureSession() {
