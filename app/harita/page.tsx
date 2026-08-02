@@ -19,16 +19,34 @@ type QueryData = {
   };
 };
 
+type SearchParams = Promise<{
+  location?: string | string[];
+  sector?: string | string[];
+  verified?: string | string[];
+}>;
+
 const EMPTY_DATA: QueryData = {
   companies: {
     nodes: [],
   },
 };
 
-export default async function MapPage() {
+function getSingleValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+export default async function MapPage({ searchParams }: { searchParams: SearchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const initialLocation = getSingleValue(resolvedSearchParams.location).trim();
+  const initialSector = getSingleValue(resolvedSearchParams.sector).trim();
+  const initialVerified = getSingleValue(resolvedSearchParams.verified).trim() === "true";
+
   const { data, hasError } = await queryWithFallback<QueryData>(
     {
       query: GET_COMPANIES_WITH_MAP,
+      variables: {
+        first: 200,
+      },
     },
     EMPTY_DATA,
     "companies map listing",
@@ -50,7 +68,7 @@ export default async function MapPage() {
   }
 
   return (
-    <div className="space-y-8 bg-gray-50 pb-10">
+    <div className="-mx-4 -my-8 space-y-8 bg-gray-50 pb-10">
       <section className="relative overflow-hidden border-b border-gray-800 bg-secondary px-4 py-14 text-white">
         <div
           className="absolute inset-0 opacity-10"
@@ -66,8 +84,8 @@ export default async function MapPage() {
           </div>
           <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">Firmalar Haritası</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-300 md:text-base">
-            Şehir ve sektör filtreleriyle firmaları harita üzerinde keşfedin. İşaretçiye tıklayarak firma
-            iletişim bilgilerine ve profile hızlıca ulaşın.
+            Firmalar Haritası - Sektörel Keşfetme deneyimiyle şehir ve sektör filtreleri arasında gezinin.
+            İşaretçiye tıklayarak firma iletişim bilgilerine ve profile hızlıca ulaşın.
           </p>
         </div>
       </section>
@@ -78,8 +96,15 @@ export default async function MapPage() {
         </div>
       ) : null}
 
-      <div className="container mx-auto">
-        <LazyCompanyMap companies={companies} />
+      <div className="container mx-auto px-4">
+        <LazyCompanyMap
+          companies={companies}
+          initialFilters={{
+            location: initialLocation,
+            sector: initialSector,
+            verified: initialVerified,
+          }}
+        />
       </div>
     </div>
   );

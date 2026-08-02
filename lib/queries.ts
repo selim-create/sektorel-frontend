@@ -130,8 +130,8 @@ export const GET_ALL_LOCATIONS = gql`
 `;
 
 export const GET_COMPANIES_WITH_MAP = gql`
-  query GetCompaniesWithMap {
-    companies(first: 500, where: { orderby: { field: DATE, order: DESC } }) {
+  query GetCompaniesWithMap($first: Int = 200) {
+    companies(first: $first, where: { orderby: { field: DATE, order: DESC } }) {
       nodes {
         id
         title
@@ -141,8 +141,14 @@ export const GET_COMPANIES_WITH_MAP = gql`
           email
           phone
           address
+          website
           mapLat
           mapLng
+        }
+        featuredImage {
+          node {
+            sourceUrl
+          }
         }
         sectors {
           nodes {

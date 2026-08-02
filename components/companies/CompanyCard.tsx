@@ -46,7 +46,8 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
   const title = company.title?.trim() || "Firma";
   const slug = company.slug?.trim() || "";
   const details = company.companyDetails || {};
-  const locationName = company.locations?.nodes?.find((item) => item?.name)?.name || "Türkiye";
+  const primaryLocation = company.locations?.nodes?.find((item) => item?.name);
+  const locationName = primaryLocation?.name || "Türkiye";
   const imageSrc = company.featuredImage?.node?.sourceUrl || null;
 
   return (
@@ -79,18 +80,24 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
             .filter((item): item is TaxonomyNode => Boolean(item?.name))
             .slice(0, 3)
             .map((sector) => (
-              <span
-                className="bg-orange-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-primary"
+              <Link
+                className="bg-orange-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-primary hover:bg-orange-100"
+                href={sector.slug ? `/firmalar?sector=${sector.slug}` : "/firmalar"}
                 key={sector.slug ?? sector.name}
               >
                 {sector.name}
-              </span>
+              </Link>
             ))}
         </div>
 
         <p className="mt-4 flex items-center gap-2 text-sm text-gray-600">
           <MapPin size={14} className="text-primary" />
-          {locationName}
+          <Link
+            className="font-semibold text-secondary hover:text-primary"
+            href={primaryLocation?.slug ? `/firmalar?location=${primaryLocation.slug}` : "/firmalar"}
+          >
+            {locationName}
+          </Link>
         </p>
 
         {details.address ? (

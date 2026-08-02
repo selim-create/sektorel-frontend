@@ -12,6 +12,24 @@ const CompanyMap = dynamic(() => import("@/components/map/CompanyMap"), {
   ),
 });
 
-export default function LazyCompanyMap({ companies }: { companies: MapCompany[] }) {
-  return <CompanyMap companies={companies} />;
+type InitialFilters = {
+  location?: string;
+  sector?: string;
+  verified?: boolean;
+};
+
+export default function LazyCompanyMap({
+  companies,
+  initialFilters,
+}: {
+  companies: MapCompany[];
+  initialFilters?: InitialFilters;
+}) {
+  return (
+    <CompanyMap
+      companies={companies}
+      initialFilters={initialFilters}
+      key={`${initialFilters?.sector ?? ""}:${initialFilters?.location ?? ""}:${initialFilters?.verified ? "1" : "0"}`}
+    />
+  );
 }
