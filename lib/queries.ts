@@ -148,6 +148,51 @@ export const GET_JOBS = gql`
   }
 `;
 
+// --- HABERLER ---
+export const GET_ALL_POSTS = gql`
+  query GetAllPosts($after: String) {
+    posts(first: 50, after: $after, where: { orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        excerpt
+        date
+        content
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+        categories {
+          nodes {
+            id
+            name
+            slug
+          }
+        }
+        author {
+          node {
+            name
+          }
+        }
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+    categories(first: 50, where: { orderby: COUNT, order: DESC, hideEmpty: true }) {
+      nodes {
+        id
+        name
+        slug
+        count
+      }
+    }
+  }
+`;
+
 export const GET_JOB_DATA = gql`
   query GetJobData($slug: ID!) {
     job(id: $slug, idType: SLUG) {
