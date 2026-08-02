@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@apollo/client": "^4.1.3",
-    "@apollo/experimental-nextjs-app-support": "^0.14.4",
+    "@apollo/client-integration-nextjs": "^0.14.4",
     "clsx": "^2.1.1",
     "graphql": "^16.12.0",
     "lucide-react": "^0.563.0",

@@ -3,8 +3,15 @@ import {
   registerApolloClient,
   ApolloClient,
   InMemoryCache,
-} from "@apollo/experimental-nextjs-app-support";
+} from "@apollo/client-integration-nextjs";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT, logGraphQLError } from "@/lib/error-handler";
+
+const RETRY_ATTEMPTS = 2;
+const RETRY_BASE_DELAY_MS = 250;
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export const { getClient } = registerApolloClient(() => {
   return new ApolloClient({
@@ -32,26 +39,43 @@ export async function queryWithFallback<TData, TVariables extends OperationVaria
   fallbackData: TData,
   scope = "query",
 ) {
-  try {
-    const result = await getClient().query<TData, TVariables>({
-      ...options,
-      errorPolicy: "all",
-    });
+  for (let attempt = 0; attempt <= RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await getClient().query<TData, TVariables>({
+        ...options,
+        errorPolicy: "all",
+      });
 
-    if (result.error) {
-      logGraphQLError(scope, result.error);
+      if (!result.error || attempt === RETRY_ATTEMPTS) {
+        if (result.error) {
+          logGraphQLError(`${scope} (attempt ${attempt + 1})`, result.error);
+        }
+
+        return {
+          data: result.data ?? fallbackData,
+          hasError: Boolean(result.error),
+        };
+      }
+
+      logGraphQLError(`${scope} (attempt ${attempt + 1})`, result.error);
+    } catch (error) {
+      if (attempt === RETRY_ATTEMPTS) {
+        logGraphQLError(`${scope} (attempt ${attempt + 1})`, error);
+
+        return {
+          data: fallbackData,
+          hasError: true,
+        };
+      }
+
+      logGraphQLError(`${scope} (attempt ${attempt + 1})`, error);
     }
 
-    return {
-      data: result.data ?? fallbackData,
-      hasError: Boolean(result.error),
-    };
-  } catch (error) {
-    logGraphQLError(scope, error);
-
-    return {
-      data: fallbackData,
-      hasError: true,
-    };
+    await sleep(RETRY_BASE_DELAY_MS * 2 ** attempt);
   }
+
+  return {
+    data: fallbackData,
+    hasError: true,
+  };
 }

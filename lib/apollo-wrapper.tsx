@@ -3,10 +3,10 @@
 import { ApolloLink, HttpLink } from "@apollo/client";
 import {
   ApolloNextAppProvider,
-  NextSSRApolloClient,
-  NextSSRInMemoryCache,
+  ApolloClient,
+  InMemoryCache,
   SSRMultipartLink,
-} from "@apollo/experimental-nextjs-app-support/ssr";
+} from "@apollo/client-integration-nextjs";
 import ErrorBoundary from "@/components/error/ErrorBoundary";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT } from "@/lib/error-handler";
 
@@ -15,8 +15,8 @@ function makeClient() {
     uri: GRAPHQL_ENDPOINT,
   });
 
-  return new NextSSRApolloClient({
-    cache: new NextSSRInMemoryCache(),
+  return new ApolloClient({
+    cache: new InMemoryCache(),
     defaultOptions: {
       query: {
         errorPolicy: "all",
