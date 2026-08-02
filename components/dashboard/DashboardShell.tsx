@@ -85,7 +85,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const company = profile?.company;
   const companyRole = profile?.companyRole || "";
   const isOwner = companyRole === "owner";
-  const canCreateContent = companyRole === "owner" || companyRole === "editor" || !company;
   const displayName = company?.title || profile?.displayName || fallbackUser?.name || "Üye";
   const accountLabel = company
     ? companyRoleLabels[companyRole] || (company.status === "publish" ? "Kurumsal Üye" : "Firma Onay Bekliyor")
@@ -133,21 +132,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <Link href="/hesabim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
             <LayoutDashboard size={18} className="group-hover:text-primary" /> Özet Durum
           </Link>
-          {canCreateContent ? (
-            <Link href="/hesabim/ilanlarim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-              <Briefcase size={18} className="group-hover:text-primary" /> İlanlarım & Talepler
-            </Link>
-          ) : null}
+          <Link href="/hesabim/ilanlarim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+            <Briefcase size={18} className="group-hover:text-primary" /> İlanlar & Talepler
+          </Link>
           {isOwner ? (
             <Link href="/hesabim/teklifler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
               <FileText size={18} className="group-hover:text-primary" /> Gelen Teklifler
             </Link>
           ) : null}
-          {canCreateContent ? (
-            <Link href="/hesabim/etkinlikler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-              <Calendar size={18} className="group-hover:text-primary" /> Etkinliklerim
-            </Link>
-          ) : null}
+          <Link href="/hesabim/etkinlikler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+            <Calendar size={18} className="group-hover:text-primary" /> Etkinlikler
+          </Link>
 
           {isOwner ? (
             <>
