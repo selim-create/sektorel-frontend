@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@apollo/client/react";
 import { Mail, Lock, ArrowRight, AlertCircle, Briefcase } from "lucide-react";
 import { LOGIN_MUTATION } from "@/lib/mutations";
-import { saveSession } from "@/lib/auth";
+import { hydrateSessionUser, saveSession } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
-    onCompleted: (data) => {
+    onCompleted: async (data) => {
       const session = data?.login;
 
       if (!session?.authToken || !session?.refreshToken || !session?.user) {
@@ -23,6 +23,7 @@ export default function LoginPage() {
       }
 
       saveSession(session.authToken, session.refreshToken, session.user);
+      await hydrateSessionUser(session.authToken);
       router.replace("/hesabim");
       router.refresh();
     },
