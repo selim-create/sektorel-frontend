@@ -1,6 +1,6 @@
 "use client";
 
-import { ApolloLink, HttpLink } from "@apollo/client";
+import { ApolloLink, HttpLink, Observable } from "@apollo/client";
 import {
   ApolloNextAppProvider,
   ApolloClient,
@@ -9,7 +9,7 @@ import {
 } from "@apollo/client-integration-nextjs";
 import ErrorBoundary from "@/components/error/ErrorBoundary";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT } from "@/lib/error-handler";
-import { getAccessToken } from "@/lib/auth";
+import { getValidAccessToken } from "@/lib/auth";
 
 function makeClient() {
   const httpLink = new HttpLink({
@@ -17,16 +17,34 @@ function makeClient() {
   });
 
   const authLink = new ApolloLink((operation, forward) => {
-    const token = getAccessToken();
+    return new Observable((observer) => {
+      let subscription: { unsubscribe: () => void } | undefined;
+      let cancelled = false;
 
-    operation.setContext(({ headers = {} }) => ({
-      headers: {
-        ...headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    }));
+      getValidAccessToken()
+        .then((token) => {
+          if (cancelled) return;
 
-    return forward(operation);
+          operation.setContext(({ headers = {} }) => ({
+            headers: {
+              ...headers,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }));
+
+          subscription = forward(operation).subscribe({
+            next: (value) => observer.next(value),
+            error: (error) => observer.error(error),
+            complete: () => observer.complete(),
+          });
+        })
+        .catch((error) => observer.error(error));
+
+      return () => {
+        cancelled = true;
+        subscription?.unsubscribe();
+      };
+    });
   });
 
   const transportLink = typeof window === "undefined"
