@@ -1,164 +1,313 @@
-import Link from "next/link";
-import { 
-  Search, 
-  Building2, 
-  FileText, 
-  Calendar, 
-  Briefcase, 
-  ChevronRight, 
-  MapPin,
-  Clock
-} from "lucide-react";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { TrendingUp } from "lucide-react";
+import FallbackUI from "@/components/error/FallbackUI";
+import { queryWithFallback } from "@/lib/graphql-client";
+import {
+  SEARCH_COMPANIES,
+  SEARCH_POSTS,
+  SEARCH_EVENTS,
+  SEARCH_JOBS,
+} from "@/lib/queries";
+import SearchBar from "@/components/search/SearchBar";
+import SearchTabs from "@/components/search/SearchTabs";
+import SearchResults from "@/components/search/SearchResults";
+import SearchSidebar from "@/components/search/SearchSidebar";
+import RecentSearches from "@/components/search/RecentSearches";
+import type { SearchResultItem } from "@/components/search/SearchCard";
 
-// MOCK DATA: Karışık Arama Sonuçları
-const RESULTS = [
-  {
-    id: 1,
-    type: "FİRMA",
-    title: "Yıldız Yapı Mimarlık",
-    description: "30 yıllık tecrübemizle kentsel dönüşüm ve mimari projelerde hizmet veriyoruz.",
-    link: "/firma/yildiz-yapi",
-    meta: "İstanbul, Kadıköy"
-  },
-  {
-    id: 2,
-    type: "HABER",
-    title: "İnşaat Sektöründe Yeni Teşvik Paketi Açıklandı",
-    description: "Ticaret Bakanlığı tarafından yapılan açıklamaya göre kentsel dönüşüm projelerine hibe desteği artırıldı.",
-    link: "/haber/insaat-tesvik",
-    meta: "28 Ocak 2026"
-  },
-  {
-    id: 3,
-    title: "Avrasya Pencere Fuarı 2026",
-    type: "ETKİNLİK",
-    description: "Bölgenin en büyük pencere ve cam fuarı Tüyap'ta kapılarını açıyor.",
-    link: "/ajanda/avrasya-fuari",
-    meta: "04 Mart 2026"
-  },
-  {
-    id: 4,
-    title: "Satış Müdürü",
-    type: "KARİYER",
-    description: "Yıldız Yapı Mimarlık bünyesinde görevlendirilecek, inşaat malzemeleri satışında deneyimli yönetici aranıyor.",
-    link: "/kariyer/satis-muduru",
-    meta: "Tam Zamanlı"
-  },
-  {
-    id: 5,
-    title: "200 Ton İnşaat Demiri Alımı",
-    type: "TİCARET",
-    description: "Kartal projemiz için nervürlü inşaat demiri alım talebi.",
-    link: "/firsatlar/insaat-demiri",
-    meta: "Alım Talebi"
-  }
-];
+export const revalidate = 30;
 
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+type SearchParams = Promise<{ q?: string; tab?: string }>;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
   const { q } = await searchParams;
-  const query = q || "inşaat"; // Varsayılan arama terimi simülasyonu
+  return {
+    title: q ? `"${q}" araması | Sektörel Ajanda` : "Arama | Sektörel Ajanda",
+    description: q
+      ? `"${q}" için firmalar, haberler, etkinlikler ve iş ilanlarında arama sonuçları.`
+      : "Firmalar, haberler, etkinlikler ve iş ilanlarında arama yapın.",
+  };
+}
+
+type TabKey = "all" | "companies" | "posts" | "events" | "jobs";
+
+function getSingleValue(value?: string | string[]) {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+export default async function SearchPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const { q, tab } = await searchParams;
+  const searchQuery = getSingleValue(q).trim();
+  const activeTab = (getSingleValue(tab) || "all") as TabKey;
+
+  // Empty state when no query provided
+  if (!searchQuery) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+        <HeroSection searchQuery="" />
+        <div className="container mx-auto max-w-5xl px-4 py-12">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[240px_1fr]">
+            <Suspense>
+              <RecentSearches />
+            </Suspense>
+            <div className="border border-dashed border-gray-300 bg-white px-6 py-20 text-center shadow-sm">
+              <TrendingUp size={40} className="mx-auto mb-4 text-primary" />
+              <h2 className="text-2xl font-black text-secondary">
+                Ne aramak istersiniz?
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-gray-500">
+                Yukarıdaki arama kutusuna firma adı, haber başlığı, etkinlik veya iş
+                ilanı girebilirsiniz.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fetch all content types in parallel
+  const variables = { variables: { search: searchQuery } };
+
+  const [
+    { data: companiesData, hasError: companiesError },
+    { data: postsData, hasError: postsError },
+    { data: eventsData, hasError: eventsError },
+    { data: jobsData, hasError: jobsError },
+  ] = await Promise.all([
+    queryWithFallback(
+      { query: SEARCH_COMPANIES, ...variables },
+      { companies: { nodes: [] } },
+      "search companies",
+    ),
+    queryWithFallback(
+      { query: SEARCH_POSTS, ...variables },
+      { posts: { nodes: [] } },
+      "search posts",
+    ),
+    queryWithFallback(
+      { query: SEARCH_EVENTS, ...variables },
+      { events: { nodes: [] } },
+      "search events",
+    ),
+    queryWithFallback(
+      { query: SEARCH_JOBS, ...variables },
+      { jobs: { nodes: [] } },
+      "search jobs",
+    ),
+  ]);
+
+  const hasError = companiesError && postsError && eventsError && jobsError;
+
+  if (hasError) {
+    return (
+      <FallbackUI
+        title="Arama şu anda kullanılamıyor"
+        message="Arama servisi geçici olarak erişilemiyor. Lütfen kısa süre sonra tekrar deneyin."
+        actionLabel="Ana sayfaya dön"
+        href="/"
+      />
+    );
+  }
+
+  // Map raw data to SearchResultItem[]
+  type RawNode = {
+    id?: string | null;
+    slug?: string | null;
+    title?: string | null;
+    excerpt?: string | null;
+    date?: string | null;
+    content?: string | null;
+    companyDetails?: {
+      isVerified?: boolean | null;
+      address?: string | null;
+    } | null;
+    jobDetails?: {
+      companyName?: string | null;
+      location?: string | null;
+      workType?: string | null;
+      deadline?: string | null;
+    } | null;
+    eventDetails?: {
+      eventType?: string | null;
+      startDate?: string | null;
+      venue?: string | null;
+      organizer?: string | null;
+    } | null;
+    sectors?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
+    locations?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
+    categories?: { nodes?: Array<{ name?: string | null } | null> | null } | null;
+    featuredImage?: { node?: { sourceUrl?: string | null } | null } | null;
+  };
+
+  type RawCompaniesData = { companies?: { nodes?: RawNode[] | null } | null };
+  type RawPostsData = { posts?: { nodes?: RawNode[] | null } | null };
+  type RawEventsData = { events?: { nodes?: RawNode[] | null } | null };
+  type RawJobsData = { jobs?: { nodes?: RawNode[] | null } | null };
+
+  const companyItems: SearchResultItem[] = (
+    (companiesData as RawCompaniesData)?.companies?.nodes ?? []
+  )
+    .filter((n): n is RawNode & { id: string; slug: string } => Boolean(n?.id && n?.slug))
+    .map((n): SearchResultItem => ({
+      type: "company",
+      id: n.id,
+      title: n.title || "İsimsiz firma",
+      slug: n.slug,
+      sector: n.sectors?.nodes?.[0]?.name ?? null,
+      location:
+        n.locations?.nodes?.[0]?.name ?? n.companyDetails?.address ?? null,
+      isVerified: n.companyDetails?.isVerified ?? null,
+      imageUrl: n.featuredImage?.node?.sourceUrl ?? null,
+    }));
+
+  const postItems: SearchResultItem[] = (
+    (postsData as RawPostsData)?.posts?.nodes ?? []
+  )
+    .filter((n): n is RawNode & { id: string; slug: string } => Boolean(n?.id && n?.slug))
+    .map((n): SearchResultItem => ({
+      type: "post",
+      id: n.id,
+      title: n.title || "Başlıksız haber",
+      slug: n.slug,
+      excerpt: n.excerpt ?? null,
+      date: n.date ?? null,
+      category: n.categories?.nodes?.[0]?.name ?? null,
+      imageUrl: n.featuredImage?.node?.sourceUrl ?? null,
+    }));
+
+  const eventItems: SearchResultItem[] = (
+    (eventsData as RawEventsData)?.events?.nodes ?? []
+  )
+    .filter((n): n is RawNode & { id: string; slug: string } => Boolean(n?.id && n?.slug))
+    .map((n): SearchResultItem => ({
+      type: "event",
+      id: n.id,
+      title: n.title || "Başlıksız etkinlik",
+      slug: n.slug,
+      eventType: n.eventDetails?.eventType ?? null,
+      startDate: n.eventDetails?.startDate ?? null,
+      venue: n.eventDetails?.venue ?? null,
+      organizer: n.eventDetails?.organizer ?? null,
+    }));
+
+  const jobItems: SearchResultItem[] = (
+    (jobsData as RawJobsData)?.jobs?.nodes ?? []
+  )
+    .filter((n): n is RawNode & { id: string; slug: string } => Boolean(n?.id && n?.slug))
+    .map((n): SearchResultItem => ({
+      type: "job",
+      id: n.id,
+      title: n.title || "Başlıksız ilan",
+      slug: n.slug,
+      companyName: n.jobDetails?.companyName ?? null,
+      location: n.jobDetails?.location ?? null,
+      workType: n.jobDetails?.workType ?? null,
+      deadline: n.jobDetails?.deadline ?? null,
+    }));
+
+  const counts = {
+    all: companyItems.length + postItems.length + eventItems.length + jobItems.length,
+    companies: companyItems.length,
+    posts: postItems.length,
+    events: eventItems.length,
+    jobs: jobItems.length,
+  };
+
+  // Filter by active tab
+  const filteredItems: SearchResultItem[] =
+    activeTab === "all"
+      ? [...companyItems, ...postItems, ...eventItems, ...jobItems]
+      : activeTab === "companies"
+      ? companyItems
+      : activeTab === "posts"
+      ? postItems
+      : activeTab === "events"
+      ? eventItems
+      : jobItems;
+
+  const partialError =
+    companiesError || postsError || eventsError || jobsError;
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20 font-sans">
-      
-      {/* 1. HEADER & SEARCH BAR */}
-      <section className="bg-white border-b border-gray-200 py-12 px-4">
-        <div className="container mx-auto max-w-4xl">
-           <h1 className="text-2xl md:text-3xl font-black text-secondary uppercase tracking-tight mb-6">
-             Arama Sonuçları: <span className="text-primary">"{query}"</span>
-           </h1>
-           
-           <div className="relative">
-             <input 
-               type="text" 
-               defaultValue={query}
-               placeholder="Sitede ara..." 
-               className="w-full pl-12 pr-32 py-4 bg-gray-50 border border-gray-200 text-base font-medium focus:outline-none focus:border-primary focus:bg-white transition-colors shadow-inner"
-             />
-             {/* İkon Düzeltmesi: top-1/2 ile dikey ortalama */}
-             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-             
-             {/* Buton Düzeltmesi: top-1/2 ile dikey ortalama */}
-             <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-secondary text-white px-6 py-2 text-sm font-bold uppercase hover:bg-primary transition-colors">
-               Ara
-             </button>
-           </div>
-        </div>
-      </section>
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      <HeroSection searchQuery={searchQuery} />
 
-      {/* 2. SONUÇLAR VE FİLTRELER */}
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <div className="flex flex-col md:flex-row gap-12">
-          
-          {/* SOL: Sekmeler / Filtreler */}
-          <aside className="w-full md:w-1/4">
-             <div className="bg-white border border-gray-200 p-6 shadow-sm sticky top-24">
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Filtrele</h3>
-                <nav className="space-y-1">
-                  {[
-                    { label: "Tümü", count: 125, active: true },
-                    { label: "Firmalar", count: 45, active: false },
-                    { label: "Haberler", count: 32, active: false },
-                    { label: "Etkinlikler", count: 12, active: false },
-                    { label: "İlanlar", count: 8, active: false },
-                    { label: "Fırsatlar", count: 28, active: false },
-                  ].map((tab, i) => (
-                    <button 
-                      key={i}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold uppercase transition-colors ${tab.active ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-secondary'}`}
-                    >
-                      <span>{tab.label}</span>
-                      <span className={`text-[10px] py-0.5 px-1.5 rounded-full ${tab.active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}`}>{tab.count}</span>
-                    </button>
-                  ))}
-                </nav>
-             </div>
-          </aside>
+      <div className="container mx-auto max-w-6xl px-4 py-10">
+        {partialError && (
+          <div className="mb-6 border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-700">
+            Bazı sonuçlar geçici olarak alınamadı. Sayfa mevcut verilerle gösteriliyor.
+          </div>
+        )}
 
-          {/* SAĞ: Sonuç Listesi */}
-          <main className="w-full md:w-3/4 space-y-4">
-             <p className="text-xs font-bold text-gray-400 uppercase mb-2">Toplam {RESULTS.length} sonuç gösteriliyor</p>
-             
-             {RESULTS.map((item) => (
-               <Link href={item.link} key={item.id} className="group block bg-white border border-gray-200 p-6 hover:border-primary hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between mb-2">
-                     <span className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wide border ${
-                        item.type === 'FİRMA' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                        item.type === 'HABER' ? 'bg-red-50 text-red-600 border-red-100' :
-                        item.type === 'ETKİNLİK' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                        'bg-gray-100 text-gray-600 border-gray-200'
-                     }`}>
-                       {item.type}
-                     </span>
-                     <ChevronRight size={16} className="text-gray-300 group-hover:text-primary transition-colors" />
-                  </div>
-                  
-                  <h3 className="text-lg font-bold text-secondary mb-2 group-hover:text-primary transition-colors">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                    {item.description}
-                  </p>
-                  
-                  <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase">
-                     {item.type === 'FİRMA' && <MapPin size={12} />}
-                     {item.type === 'ETKİNLİK' && <Calendar size={12} />}
-                     {(item.type === 'HABER' || item.type === 'KARİYER') && <Clock size={12} />}
-                     {item.meta}
-                  </div>
-               </Link>
-             ))}
+        <Suspense>
+          <SearchTabs
+            activeTab={activeTab}
+            counts={counts}
+            searchQuery={searchQuery}
+          />
+        </Suspense>
 
-             {/* Pagination */}
-             <div className="pt-8 flex justify-center">
-                <button className="px-8 py-3 border border-gray-300 text-secondary font-bold text-sm uppercase hover:bg-secondary hover:text-white transition-colors">
-                  Daha Fazla Sonuç
-                </button>
-             </div>
-          </main>
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[240px_1fr]">
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <Suspense>
+              <SearchSidebar searchQuery={searchQuery} activeTab={activeTab} />
+            </Suspense>
+            <Suspense>
+              <RecentSearches />
+            </Suspense>
+          </div>
 
+          {/* Results */}
+          <SearchResults
+            items={filteredItems}
+            activeTab={activeTab}
+            searchQuery={searchQuery}
+            totalCount={counts[activeTab]}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function HeroSection({ searchQuery }: { searchQuery: string }) {
+  return (
+    <section className="relative overflow-hidden border-b border-gray-800 bg-secondary px-4 py-16 text-white">
+      <div
+        className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+      <div className="container relative z-10 mx-auto max-w-3xl">
+        <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-gray-300">
+          <TrendingUp size={12} className="text-primary" />
+          Global Arama
+        </div>
+        <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">
+          Sektörel Ajanda
+        </h1>
+        <p className="mt-4 text-lg leading-8 text-gray-300">
+          Firmalar, haberler, etkinlikler ve daha fazlasını ara.
+        </p>
+        <div className="mt-8">
+          <Suspense>
+            <SearchBar defaultValue={searchQuery} />
+          </Suspense>
+        </div>
+      </div>
+    </section>
   );
 }

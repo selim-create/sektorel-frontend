@@ -193,6 +193,111 @@ export const GET_ALL_POSTS = gql`
   }
 `;
 
+// --- ARAMA: FİRMALAR ---
+export const SEARCH_COMPANIES = gql`
+  query SearchCompanies($search: String!) {
+    companies(first: 10, where: { search: $search, orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        companyDetails {
+          isVerified
+          address
+        }
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+        sectors {
+          nodes {
+            name
+            slug
+          }
+        }
+        locations {
+          nodes {
+            name
+            slug
+          }
+        }
+      }
+    }
+  }
+`;
+
+// --- ARAMA: HABERLER ---
+export const SEARCH_POSTS = gql`
+  query SearchPosts($search: String!) {
+    posts(first: 10, where: { search: $search, orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        excerpt
+        date
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+        categories {
+          nodes {
+            id
+            name
+            slug
+          }
+        }
+      }
+    }
+  }
+`;
+
+// --- ARAMA: ETKİNLİKLER ---
+export const SEARCH_EVENTS = gql`
+  query SearchEvents($search: String!) {
+    events(first: 10, where: { search: $search, orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        eventDetails {
+          eventType
+          startDate
+          venue
+          organizer
+        }
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+      }
+    }
+  }
+`;
+
+// --- ARAMA: İŞ İLANLARI ---
+export const SEARCH_JOBS = gql`
+  query SearchJobs($search: String!) {
+    jobs(first: 10, where: { search: $search, orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        date
+        jobDetails {
+          companyName
+          location
+          workType
+          deadline
+        }
+      }
+    }
+  }
+`;
+
 export const GET_JOB_DATA = gql`
   query GetJobData($slug: ID!) {
     job(id: $slug, idType: SLUG) {
