@@ -476,7 +476,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 </div>
                 
                 <div className="space-y-4">
-                  {details.relatedNews.map((news: any) => (
+                  {details.relatedNews.filter((news: any) => news?.slug).map((news: any) => (
                     <Link href={`/haber/${news.slug}`} key={news.id} className="flex gap-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0 group">
                       <div className="w-24 h-24 bg-gray-100 shrink-0 border border-gray-200 overflow-hidden">
                          {news.featuredImage?.node?.sourceUrl ? (
