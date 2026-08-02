@@ -55,21 +55,41 @@ const MODE_META = {
   },
 } as const;
 
+function getSubmissionError(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as {
+      graphQLErrors?: Array<{ message?: string }>;
+      networkError?: { message?: string };
+    };
+    const graphQLError = candidate.graphQLErrors?.find((item) => item.message)?.message;
+    if (graphQLError) return graphQLError;
+    if (candidate.networkError?.message) return candidate.networkError.message;
+  }
+
+  return "Beklenmedik bir hata oluştu.";
+}
+
 export default function ContentSubmissionForm({ mode }: Props) {
   const meta = MODE_META[mode];
   const sectorsQuery = useQuery(GET_ALL_SECTORS, { errorPolicy: "all" });
   const mutation = mode === "lead" ? SUBMIT_LEAD : mode === "job" ? SUBMIT_JOB : SUBMIT_EVENT;
-  const [submitContent, { loading }] = useMutation(mutation);
+  const [submitContent, { loading }] = useMutation(mutation, { errorPolicy: "all" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
+
     setMessage("");
     setError("");
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const value = (key: string) => String(form.get(key) || "").trim();
 
     const input: Record<string, unknown> = {
@@ -124,16 +144,22 @@ export default function ContentSubmissionForm({ mode }: Props) {
           ? result.data?.submitSektorelJob
           : result.data?.submitSektorelEvent;
 
+      const resultError = result.error?.message;
+      if (resultError && !payload?.success) {
+        setError(resultError);
+        return;
+      }
+
       if (!payload?.success) {
-        setError(payload?.message || "İçerik gönderilemedi.");
+        setError(payload?.message || "İçerik gönderilemedi. Lütfen alanları kontrol edip tekrar deneyin.");
         return;
       }
 
       setMessage(payload.message || "İçeriğiniz onaya gönderildi.");
       setSubmitted(true);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Beklenmedik bir hata oluştu.");
+      setError(getSubmissionError(submissionError));
     }
   };
 
