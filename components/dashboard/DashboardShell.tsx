@@ -31,6 +31,7 @@ const SESSION_QUERY = gql`
       email
       accountType
       role
+      companyRole
       company {
         databaseId
         title
@@ -60,12 +61,16 @@ function initials(value: string) {
     .join("") || "Ü";
 }
 
+const companyRoleLabels: Record<string, string> = {
+  owner: "Firma Sahibi",
+  editor: "Firma Editörü",
+  viewer: "Firma Görüntüleyicisi",
+};
+
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [fallbackUser, setFallbackUser] = useState<SessionUser | null>(null);
 
-  // localStorage yalnızca mount sonrasında okunur. Böylece sunucu çıktısı ile
-  // tarayıcının ilk render'ı aynı kalır ve hydration farkı oluşmaz.
   useEffect(() => {
     setFallbackUser(getSessionUser());
   }, []);
@@ -78,11 +83,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const profile = data?.sektorelSession;
   const company = profile?.company;
+  const companyRole = profile?.companyRole || "";
+  const isOwner = companyRole === "owner";
+  const canCreateContent = companyRole === "owner" || companyRole === "editor" || !company;
   const displayName = company?.title || profile?.displayName || fallbackUser?.name || "Üye";
   const accountLabel = company
-    ? company.status === "publish"
-      ? "Kurumsal Üye"
-      : "Firma Onay Bekliyor"
+    ? companyRoleLabels[companyRole] || (company.status === "publish" ? "Kurumsal Üye" : "Firma Onay Bekliyor")
     : profile?.accountType === "kurumsal"
       ? "Kurumsal Üye"
       : "Bireysel Üye";
@@ -127,24 +133,34 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <Link href="/hesabim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
             <LayoutDashboard size={18} className="group-hover:text-primary" /> Özet Durum
           </Link>
-          <Link href="/hesabim/ilanlarim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <Briefcase size={18} className="group-hover:text-primary" /> İlanlarım & Talepler
-          </Link>
-          <Link href="/hesabim/teklifler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <FileText size={18} className="group-hover:text-primary" /> Gelen Teklifler
-          </Link>
-          <Link href="/hesabim/etkinlikler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <Calendar size={18} className="group-hover:text-primary" /> Etkinliklerim
-          </Link>
+          {canCreateContent ? (
+            <Link href="/hesabim/ilanlarim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+              <Briefcase size={18} className="group-hover:text-primary" /> İlanlarım & Talepler
+            </Link>
+          ) : null}
+          {isOwner ? (
+            <Link href="/hesabim/teklifler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+              <FileText size={18} className="group-hover:text-primary" /> Gelen Teklifler
+            </Link>
+          ) : null}
+          {canCreateContent ? (
+            <Link href="/hesabim/etkinlikler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+              <Calendar size={18} className="group-hover:text-primary" /> Etkinliklerim
+            </Link>
+          ) : null}
 
-          <div className="my-4 border-t border-gray-800" />
-          <p className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hesap</p>
-          <Link href="/hesabim/ayarlar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <Settings size={18} className="group-hover:text-primary" /> Firma Ayarları
-          </Link>
-          <Link href="/hesabim/kullanicilar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <User size={18} className="group-hover:text-primary" /> Alt Kullanıcılar
-          </Link>
+          {isOwner ? (
+            <>
+              <div className="my-4 border-t border-gray-800" />
+              <p className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hesap</p>
+              <Link href="/hesabim/ayarlar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+                <Settings size={18} className="group-hover:text-primary" /> Firma Ayarları
+              </Link>
+              <Link href="/hesabim/kullanicilar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
+                <User size={18} className="group-hover:text-primary" /> Alt Kullanıcılar
+              </Link>
+            </>
+          ) : null}
         </nav>
 
         <div className="p-4 border-t border-gray-800">
