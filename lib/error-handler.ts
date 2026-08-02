@@ -1,6 +1,6 @@
 import { onError } from "@apollo/client/link/error";
 
-const DEFAULT_GRAPHQL_ENDPOINT = "http://api.sektorelajanda.com/graphql";
+const DEFAULT_GRAPHQL_ENDPOINT = "https://api.sektorelajanda.com/graphql";
 
 export const GRAPHQL_ENDPOINT =
   process.env.NEXT_PUBLIC_WORDPRESS_API_URL?.trim() ||
