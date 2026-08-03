@@ -6,11 +6,19 @@ import {
 } from "@apollo/client-integration-nextjs";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT, logGraphQLError } from "@/lib/error-handler";
 
-const RETRY_ATTEMPTS = 2;
-const RETRY_BASE_DELAY_MS = 250;
+const REQUEST_TIMEOUT_MS = 5000;
+const RETRY_ATTEMPTS = 0;
 
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+async function timedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = init?.signal
+    ? AbortSignal.any([init.signal, timeoutSignal])
+    : timeoutSignal;
+
+  return fetch(input, {
+    ...init,
+    signal,
+  });
 }
 
 export const { getClient } = registerApolloClient(() => {
@@ -28,6 +36,7 @@ export const { getClient } = registerApolloClient(() => {
       createApolloErrorLink("server"),
       new HttpLink({
         uri: GRAPHQL_ENDPOINT,
+        fetch: timedFetch,
       }),
     ]),
   });
@@ -45,32 +54,22 @@ export async function queryWithFallback<TData, TVariables extends OperationVaria
         errorPolicy: "all",
       });
 
-      if (!result.error || attempt === RETRY_ATTEMPTS) {
-        if (result.error) {
-          logGraphQLError(`${scope} (attempt ${attempt + 1})`, result.error);
-        }
-
-        return {
-          data: result.data ?? fallbackData,
-          hasError: Boolean(result.error),
-        };
+      if (result.error) {
+        logGraphQLError(`${scope} (attempt ${attempt + 1})`, result.error);
       }
 
-      logGraphQLError(`${scope} (attempt ${attempt + 1})`, result.error);
+      return {
+        data: result.data ?? fallbackData,
+        hasError: Boolean(result.error),
+      };
     } catch (error) {
-      if (attempt === RETRY_ATTEMPTS) {
-        logGraphQLError(`${scope} (attempt ${attempt + 1})`, error);
-
-        return {
-          data: fallbackData,
-          hasError: true,
-        };
-      }
-
       logGraphQLError(`${scope} (attempt ${attempt + 1})`, error);
-    }
 
-    await sleep(RETRY_BASE_DELAY_MS * 2 ** attempt);
+      return {
+        data: fallbackData,
+        hasError: true,
+      };
+    }
   }
 
   return {

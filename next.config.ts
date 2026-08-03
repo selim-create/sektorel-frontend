@@ -2,36 +2,39 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       // Canlı API Sunucusu (HTTP ve HTTPS)
       {
-        protocol: 'http',
-        hostname: 'api.sektorelajanda.com',
+        protocol: "http",
+        hostname: "api.sektorelajanda.com",
       },
       {
-        protocol: 'https',
-        hostname: 'api.sektorelajanda.com',
+        protocol: "https",
+        hostname: "api.sektorelajanda.com",
       },
-      
+
       // Lokal Geliştirme Ortamı
       {
-        protocol: 'http',
-        hostname: 'localhost',
+        protocol: "http",
+        hostname: "localhost",
       },
-      
+
       // Projede Kullandığımız Dış Kaynaklar (Placeholder vb.)
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
+        protocol: "https",
+        hostname: "placehold.co",
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
       {
-        protocol: 'https',
-        hostname: 'www.svgrepo.com',
-      }
+        protocol: "https",
+        hostname: "www.svgrepo.com",
+      },
     ],
   },
 };

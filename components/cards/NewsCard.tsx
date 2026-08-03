@@ -74,6 +74,7 @@ export default function NewsCard({ post }: NewsCardProps) {
           fill
           sizes="(min-width: 1280px) 24rem, (min-width: 768px) 50vw, 100vw"
           src={imageUrl || `https://placehold.co/960x640/f3f4f6/111827?text=${encodeURIComponent(title)}`}
+          unoptimized={!imageUrl}
         />
       </Link>
 
