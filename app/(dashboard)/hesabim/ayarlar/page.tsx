@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { gql } from "@apollo/client";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -122,6 +122,7 @@ type FormState = {
   galleryUrlsText: string;
 };
 
+type CompanySettingsData = Record<string, unknown> & { databaseId?: number | null };
 type LocationOption = { databaseId: number; name: string; slug: string };
 type WorkRow = { days: string; time: string };
 type MediaType = "logo" | "cover" | "gallery";
@@ -213,6 +214,7 @@ export default function CompanySettingsPage() {
   const [workRows, setWorkRows] = useState<WorkRow[]>(parseWorkRows(""));
   const [gallery, setGallery] = useState<string[]>([]);
   const [uploading, setUploading] = useState<MediaType | null>(null);
+  const [hydratedCompanyId, setHydratedCompanyId] = useState<number | null>(null);
 
   const settingsQuery = useQuery(COMPANY_SETTINGS_QUERY, {
     fetchPolicy: "cache-and-network",
@@ -227,13 +229,12 @@ export default function CompanySettingsPage() {
   });
   const [updateCompany, { loading: saving }] = useMutation(UPDATE_COMPANY_MUTATION);
 
-  const company = settingsQuery.data?.sektorelCompanySettings;
+  const company = settingsQuery.data?.sektorelCompanySettings as CompanySettingsData | undefined;
   const completionPercent = Number(company?.completionPercent || 0);
   const hasNoCompany = Boolean(settingsQuery.error?.message?.includes("bağlı bir firma bulunamadı"));
 
-  useEffect(() => {
-    if (!company) return;
-    const next = toForm(company);
+  const applyCompanyData = (source: CompanySettingsData) => {
+    const next = toForm(source);
     next.linkedinUrl = socialHandle(next.linkedinUrl, "linkedin");
     next.instagramUrl = socialHandle(next.instagramUrl, "instagram");
     next.facebookUrl = socialHandle(next.facebookUrl, "facebook");
@@ -244,7 +245,13 @@ export default function CompanySettingsPage() {
     setProducts(lines(next.productsText));
     setWorkRows(parseWorkRows(next.workingHoursText));
     setGallery(lines(next.galleryUrlsText));
-  }, [company]);
+    setHydratedCompanyId(Number(source.databaseId || 0));
+  };
+
+  useEffect(() => {
+    if (!company?.databaseId || hydratedCompanyId === Number(company.databaseId)) return;
+    applyCompanyData(company);
+  }, [company, hydratedCompanyId]);
 
   const sectors = sectorsQuery.data?.sectors?.nodes || [];
   const cities: LocationOption[] = citiesQuery.data?.sektorelLocationOptions || [];
@@ -270,7 +277,7 @@ export default function CompanySettingsPage() {
       const token = await getValidAccessToken();
       if (!token) throw new Error("Oturum doğrulanamadı. Lütfen yeniden giriş yapın.");
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", file, file.name);
       body.append("type", type);
       const response = await fetch(MEDIA_ENDPOINT, {
         method: "POST",
@@ -285,7 +292,7 @@ export default function CompanySettingsPage() {
       if (type === "logo") setField("logoImage", payload.url);
       if (type === "cover") setField("coverImage", payload.url);
       if (type === "gallery") setGallery((current) => [...current, payload.url].slice(0, 12));
-      setMessage("Görsel yüklendi. Profil bilgilerini kaydetmeyi unutmayın.");
+      setMessage("Görsel yüklendi ve medya kütüphanesine kaydedildi.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Görsel yüklenemedi.");
     } finally {
@@ -308,33 +315,43 @@ export default function CompanySettingsPage() {
       .map((row) => `${row.days.trim()}: ${row.time.trim()}`)
       .join("\n");
 
-    try {
-      const result = await updateCompany({
-        variables: {
-          input: {
-            clientMutationId: "update-company-settings",
-            ...Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value.trim()])),
-            linkedinUrl: socialUrl("linkedin", form.linkedinUrl),
-            instagramUrl: socialUrl("instagram", form.instagramUrl),
-            facebookUrl: socialUrl("facebook", form.facebookUrl),
-            twitterUrl: socialUrl("twitter", form.twitterUrl),
-            youtubeUrl: socialUrl("youtube", form.youtubeUrl),
-            servicesText: services.join("\n"),
-            productsText: products.join("\n"),
-            workingHoursText,
-            galleryUrlsText: gallery.join("\n"),
-          },
-        },
-      });
+    const input = {
+      clientMutationId: "update-company-settings",
+      title: form.title.trim(),
+      officialName: form.officialName.trim(),
+      description: form.description.trim(),
+      companyType: form.companyType.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      website: form.website.trim(),
+      address: form.address.trim(),
+      postalCode: form.postalCode.trim(),
+      sector: form.sector.trim(),
+      city: form.city.trim(),
+      district: form.district.trim(),
+      logoImage: form.logoImage.trim(),
+      coverImage: form.coverImage.trim(),
+      linkedinUrl: socialUrl("linkedin", form.linkedinUrl),
+      instagramUrl: socialUrl("instagram", form.instagramUrl),
+      facebookUrl: socialUrl("facebook", form.facebookUrl),
+      twitterUrl: socialUrl("twitter", form.twitterUrl),
+      youtubeUrl: socialUrl("youtube", form.youtubeUrl),
+      servicesText: services.join("\n"),
+      productsText: products.join("\n"),
+      workingHoursText,
+      galleryUrlsText: gallery.join("\n"),
+    };
 
+    try {
+      const result = await updateCompany({ variables: { input } });
       const payload = result.data?.updateSektorelCompany;
-      if (result.error || !payload?.success) {
+      if (result.error || !payload?.success || !payload.company) {
         setErrorMessage(result.error?.message || payload?.message || "Firma bilgileri güncellenemedi.");
         return;
       }
 
+      applyCompanyData(payload.company as CompanySettingsData);
       setMessage(payload.message || "Firma profiliniz güncellendi.");
-      await settingsQuery.refetch();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Beklenmedik bir hata oluştu.");
     }
