@@ -69,7 +69,7 @@ export default function OfferSubmissionForm({ slug }: { slug: string }) {
         },
       });
 
-      const graphError = result.error?.message || result.errors?.[0]?.message;
+      const graphError = result.error?.message;
       const payload = result.data?.submitSektorelOffer;
       if (graphError || !payload?.success) {
         setError(graphError || payload?.message || "Teklif gönderilemedi.");
