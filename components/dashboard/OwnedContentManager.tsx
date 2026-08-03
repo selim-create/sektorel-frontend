@@ -18,6 +18,15 @@ const OWNED_CONTENT_QUERY = gql`
   }
 `;
 
+const SESSION_ROLE_QUERY = gql`
+  query SektorelContentRole {
+    sektorelSession {
+      companyRole
+      company { databaseId }
+    }
+  }
+`;
+
 const TRASH_CONTENT_MUTATION = gql`
   mutation TrashSektorelOwnedContent($databaseId: Int!) {
     trashSektorelOwnedContent(
@@ -79,13 +88,20 @@ export default function OwnedContentManager({ title, description, types, createH
     fetchPolicy: "cache-and-network",
     errorPolicy: "all",
   });
+  const roleQuery = useQuery(SESSION_ROLE_QUERY, {
+    fetchPolicy: "cache-and-network",
+    errorPolicy: "all",
+  });
   const [trashContent, { loading: deleting }] = useMutation(TRASH_CONTENT_MUTATION);
 
+  const companyRole = roleQuery.data?.sektorelSession?.companyRole || "";
+  const isViewer = companyRole === "viewer";
+  const canEdit = !isViewer;
   const allItems = data?.sektorelOwnedContent || [];
   const items = singleType ? allItems : allItems.filter((item: { type: string }) => types.includes(item.type));
 
   const handleDelete = async (databaseId: number, itemTitle: string) => {
-    if (!window.confirm(`“${itemTitle}” çöp kutusuna taşınsın mı?`)) return;
+    if (!canEdit || !window.confirm(`“${itemTitle}” çöp kutusuna taşınsın mı?`)) return;
     await trashContent({ variables: { databaseId } });
     await refetch();
   };
@@ -97,12 +113,18 @@ export default function OwnedContentManager({ title, description, types, createH
           <h1 className="text-2xl font-black uppercase tracking-tight text-secondary">{title}</h1>
           <p className="mt-1 text-sm text-gray-500">{description}</p>
         </div>
-        {createHref && createLabel ? (
+        {canEdit && createHref && createLabel ? (
           <Link href={createHref} className="inline-flex items-center gap-2 bg-primary px-5 py-3 text-sm font-black uppercase tracking-wide text-white">
             <Plus size={16} /> {createLabel}
           </Link>
         ) : null}
       </div>
+
+      {isViewer ? (
+        <div className="border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
+          Görüntüleyici rolüyle firma içeriklerini görebilirsiniz; oluşturma, düzenleme ve silme işlemleri kapalıdır.
+        </div>
+      ) : null}
 
       {error ? (
         <div className="flex items-start gap-3 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -134,12 +156,16 @@ export default function OwnedContentManager({ title, description, types, createH
                         <Eye size={14} /> Önizle
                       </Link>
                     ) : null}
-                    <Link href={`/hesabim/icerik-duzenle/${item.databaseId}`} className="inline-flex items-center gap-2 border border-primary/30 px-3 py-2 text-xs font-black uppercase text-primary hover:bg-orange-50">
-                      <Pencil size={14} /> Düzenle
-                    </Link>
-                    <button type="button" onClick={() => handleDelete(item.databaseId, item.title)} disabled={deleting} className="inline-flex items-center gap-2 border border-red-200 px-3 py-2 text-xs font-black uppercase text-red-600 hover:bg-red-50 disabled:opacity-50">
-                      <Trash2 size={14} /> Sil
-                    </button>
+                    {canEdit ? (
+                      <>
+                        <Link href={`/hesabim/icerik-duzenle/${item.databaseId}`} className="inline-flex items-center gap-2 border border-primary/30 px-3 py-2 text-xs font-black uppercase text-primary hover:bg-orange-50">
+                          <Pencil size={14} /> Düzenle
+                        </Link>
+                        <button type="button" onClick={() => handleDelete(item.databaseId, item.title)} disabled={deleting} className="inline-flex items-center gap-2 border border-red-200 px-3 py-2 text-xs font-black uppercase text-red-600 hover:bg-red-50 disabled:opacity-50">
+                          <Trash2 size={14} /> Sil
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -149,7 +175,7 @@ export default function OwnedContentManager({ title, description, types, createH
           <div className="p-12 text-center">
             {types.includes("event") && types.length === 1 ? <CalendarDays size={40} className="mx-auto mb-4 text-gray-300" /> : <FileText size={40} className="mx-auto mb-4 text-gray-300" />}
             <h2 className="font-black uppercase text-secondary">Henüz içerik bulunmuyor</h2>
-            <p className="mt-2 text-sm text-gray-500">Oluşturduğunuz içerikler burada listelenecek.</p>
+            <p className="mt-2 text-sm text-gray-500">Firma kapsamında oluşturulan içerikler burada listelenecek.</p>
           </div>
         )}
       </div>
