@@ -11,12 +11,6 @@ declare module "@apollo/client" {
   ): TypedDocumentNode<SektorelGraphQLData, SektorelGraphQLVariables>;
 }
 
-declare module "@apollo/client/react" {
-  interface MutateResult<TData = unknown> {
-    errors?: ReadonlyArray<{ message?: string }>;
-  }
-}
-
 declare module "react" {
   interface CSSProperties {
     [key: `--${string}`]: string | number | undefined;
