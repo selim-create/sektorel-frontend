@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { TypedDocumentNode } from "@apollo/client";
 
 type SektorelGraphQLData = Record<string, any>;
@@ -8,4 +9,16 @@ declare module "@apollo/client" {
     literals: TemplateStringsArray,
     ...placeholders: unknown[]
   ): TypedDocumentNode<SektorelGraphQLData, SektorelGraphQLVariables>;
+}
+
+declare module "@apollo/client/react" {
+  interface MutateResult<TData = unknown> {
+    errors?: ReadonlyArray<{ message?: string }>;
+  }
+}
+
+declare module "react" {
+  interface CSSProperties {
+    [key: `--${string}`]: string | number | undefined;
+  }
 }
