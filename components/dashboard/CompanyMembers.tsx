@@ -90,7 +90,7 @@ export default function CompanyMembers() {
       },
     });
 
-    const graphError = result.error?.message || result.errors?.[0]?.message;
+    const graphError = result.error?.message;
     const payload = result.data?.addSektorelCompanyMember;
     if (graphError || !payload?.success) {
       setActionError(graphError || payload?.message || "Kullanıcı eklenemedi.");
@@ -115,7 +115,7 @@ export default function CompanyMembers() {
       },
     });
 
-    const graphError = result.error?.message || result.errors?.[0]?.message;
+    const graphError = result.error?.message;
     const payload = result.data?.updateSektorelCompanyMemberRole;
     if (graphError || !payload?.success) {
       setActionError(graphError || payload?.message || "Rol güncellenemedi.");
@@ -140,7 +140,7 @@ export default function CompanyMembers() {
       },
     });
 
-    const graphError = result.error?.message || result.errors?.[0]?.message;
+    const graphError = result.error?.message;
     const payload = result.data?.removeSektorelCompanyMember;
     if (graphError || !payload?.success) {
       setActionError(graphError || payload?.message || "Kullanıcı çıkarılamadı.");

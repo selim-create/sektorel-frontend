@@ -56,21 +56,10 @@ export function logGraphQLError(scope: string, error: unknown) {
 }
 
 export function createApolloErrorLink(scope: string) {
-  return onError(({ graphQLErrors, networkError, operation }) => {
-    if (graphQLErrors?.length) {
-      graphQLErrors.forEach((error) => {
-        console.warn(
-          `[GraphQL] ${scope} (${operation.operationName || "anonymous"})`,
-          error.message,
-        );
-      });
-    }
-
-    if (networkError) {
-      console.warn(
-        `[GraphQL] ${scope} network error (${operation.operationName || "anonymous"})`,
-        networkError,
-      );
-    }
+  return onError(({ error, operation }) => {
+    console.warn(
+      `[GraphQL] ${scope} (${operation.operationName || "anonymous"})`,
+      extractGraphQLErrorDetails(error),
+    );
   });
 }

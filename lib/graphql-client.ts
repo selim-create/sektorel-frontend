@@ -28,7 +28,6 @@ export const { getClient } = registerApolloClient(() => {
       createApolloErrorLink("server"),
       new HttpLink({
         uri: GRAPHQL_ENDPOINT,
-        // Gerekirse auth headerları buraya eklenebilir
       }),
     ]),
   });

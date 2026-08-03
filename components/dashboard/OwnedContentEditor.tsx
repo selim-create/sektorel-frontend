@@ -80,7 +80,7 @@ export default function OwnedContentEditor({ databaseId }: { databaseId: number 
 
     try {
       const result = await updateContent({ variables: { input } });
-      const graphError = result.error?.message || result.errors?.[0]?.message;
+      const graphError = result.error?.message;
       const payload = result.data?.updateSektorelOwnedContent;
       if (graphError || !payload?.success) {
         setSaveError(graphError || payload?.message || "İçerik güncellenemedi.");

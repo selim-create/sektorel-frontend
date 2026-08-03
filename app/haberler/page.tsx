@@ -163,18 +163,23 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
     "news listing",
   );
 
-  const posts = (data?.posts?.nodes ?? []).filter(
-    (post): post is Post => Boolean(post?.id && post.slug?.trim()),
+  const postNodes = (data?.posts?.nodes ?? []) as Array<Post | null | undefined>;
+  const categoryNodes = (data?.categories?.nodes ?? []) as Array<Category | null | undefined>;
+
+  const posts = postNodes.filter(
+    (post: Post | null | undefined): post is Post => Boolean(post?.id && post.slug?.trim()),
   );
-  const categories = (data?.categories?.nodes ?? []).filter(
-    (item): item is Category => Boolean(item?.slug && item?.name),
+  const categories = categoryNodes.filter(
+    (item: Category | null | undefined): item is Category => Boolean(item?.slug && item?.name),
   );
 
   const normalizedQuery = q.toLocaleLowerCase("tr-TR");
-  const filteredPosts = posts.filter((post) => {
+  const filteredPosts = posts.filter((post: Post) => {
     const categoryMatch =
       category === "all" ||
-      (post.categories?.nodes ?? []).some((item) => item?.slug === category);
+      (post.categories?.nodes ?? []).some(
+        (item: { slug?: string | null } | null) => item?.slug === category,
+      );
 
     const dateMatch = matchesDateRange(post.date, range);
 
@@ -183,7 +188,9 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       post.excerpt,
       post.content,
       post.author?.node?.name,
-      ...(post.categories?.nodes ?? []).map((item) => item?.name),
+      ...(post.categories?.nodes ?? []).map(
+        (item: { name?: string | null } | null) => item?.name,
+      ),
     ]
       .filter(Boolean)
       .join(" ")
@@ -396,7 +403,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {remainingPosts.map((post) => (
+              {remainingPosts.map((post: Post) => (
                 <NewsCard key={post.id} post={post} />
               ))}
             </div>
