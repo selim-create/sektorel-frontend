@@ -1,10 +1,4 @@
-import {
-  ApolloLink,
-  HttpLink,
-  type DocumentNode,
-  type OperationVariables,
-  type QueryOptions,
-} from "@apollo/client";
+import { ApolloLink, HttpLink, type OperationVariables, type QueryOptions } from "@apollo/client";
 import {
   registerApolloClient,
   ApolloClient,
@@ -39,24 +33,14 @@ export const { getClient } = registerApolloClient(() => {
   });
 });
 
-type FallbackQueryOptions<TVariables extends OperationVariables> = Omit<
-  QueryOptions<TVariables, unknown>,
-  "query"
-> & {
-  query: DocumentNode;
-};
-
-export async function queryWithFallback<
-  TData,
-  TVariables extends OperationVariables = OperationVariables,
->(
-  options: FallbackQueryOptions<TVariables>,
+export async function queryWithFallback<TData, TVariables extends OperationVariables = OperationVariables>(
+  options: QueryOptions<TVariables, TData>,
   fallbackData: TData,
   scope = "query",
-): Promise<{ data: TData; hasError: boolean }> {
+) {
   for (let attempt = 0; attempt <= RETRY_ATTEMPTS; attempt += 1) {
     try {
-      const result = await getClient().query<unknown, TVariables>({
+      const result = await getClient().query<TData, TVariables>({
         ...options,
         errorPolicy: "all",
       });
@@ -67,7 +51,7 @@ export async function queryWithFallback<
         }
 
         return {
-          data: (result.data as TData | undefined) ?? fallbackData,
+          data: result.data ?? fallbackData,
           hasError: Boolean(result.error),
         };
       }
