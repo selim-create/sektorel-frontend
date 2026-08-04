@@ -273,8 +273,12 @@ export default async function Home() {
               const month = dateObj ? EVENT_MONTH_FORMATTER.format(dateObj) : "---";
 
               return (
-                <article key={event.id} className="group cursor-pointer bg-white border border-gray-200 p-0 hover:shadow-lg transition-all">
-                  <div className="flex">
+                <Link
+                  className="group block bg-white border border-gray-200 p-0 hover:shadow-lg hover:border-primary transition-all"
+                  href={`/ajanda/${event.slug}`}
+                  key={event.id}
+                >
+                  <article className="flex h-full">
                     <div className="bg-secondary text-white p-4 flex flex-col items-center justify-center min-w-[80px]">
                       <span className="text-2xl font-black">{day}</span>
                       <span className="text-xs uppercase font-bold">{month}</span>
@@ -290,8 +294,8 @@ export default async function Home() {
                         <MapPin size={12} /> {event.eventDetails?.venue || "Online"}
                       </div>
                     </div>
-                  </div>
-                </article>
+                  </article>
+                </Link>
               );
             })}
           </div>
