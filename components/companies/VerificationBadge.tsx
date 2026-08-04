@@ -11,8 +11,8 @@ export default function VerificationBadge({ isVerified, featured = false }: Veri
   }
 
   return (
-    <span className="inline-flex items-center gap-1 bg-emerald-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-      <BadgeCheck size={12} />
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+      <BadgeCheck className="shrink-0" size={12} />
       {featured ? "Öne Çıkan" : "Onaylı"}
     </span>
   );
