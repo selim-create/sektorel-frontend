@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
+import { ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import VerificationBadge from "@/components/companies/VerificationBadge";
 import CompanyAvatar from "@/components/common/CompanyAvatar";
 
@@ -137,13 +137,6 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
               <ExternalLink size={14} />
             </a>
           ) : null}
-
-          <Link
-            className="ml-auto inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-secondary transition-colors hover:text-primary"
-            href={`/firma/${slug}`}
-          >
-            Profili İncele <ArrowRight size={14} />
-          </Link>
         </div>
       </div>
     </article>
