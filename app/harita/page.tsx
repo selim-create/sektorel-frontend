@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
+import { gql } from "@apollo/client";
 import { MapPinned } from "lucide-react";
 import FallbackUI from "@/components/error/FallbackUI";
 import LazyCompanyMap from "@/components/map/LazyCompanyMap";
 import { queryWithFallback } from "@/lib/graphql-client";
-import { GET_COMPANIES_WITH_MAP } from "@/lib/queries";
 import type { MapCompany } from "@/components/map/types";
 
 export const metadata: Metadata = {
@@ -12,6 +12,49 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 60;
+
+const MAP_COMPANIES_QUERY = gql`
+  query GetCompaniesWithMap($first: Int = 200) {
+    companies(first: $first, where: { orderby: { field: DATE, order: DESC } }) {
+      nodes {
+        id
+        title
+        slug
+        companyDetails {
+          isVerified
+          email
+          phone
+          address
+          website
+          mapLat
+          mapLng
+        }
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
+        sectors {
+          nodes {
+            name
+            slug
+          }
+        }
+        locations {
+          nodes {
+            name
+            slug
+            locationDetails {
+              type
+              lat
+              lng
+            }
+          }
+        }
+      }
+    }
+  }
+`;
 
 type QueryData = {
   companies: {
@@ -43,7 +86,7 @@ export default async function MapPage({ searchParams }: { searchParams: SearchPa
 
   const { data, hasError } = await queryWithFallback<QueryData>(
     {
-      query: GET_COMPANIES_WITH_MAP,
+      query: MAP_COMPANIES_QUERY,
       variables: {
         first: 200,
       },
@@ -84,7 +127,7 @@ export default async function MapPage({ searchParams }: { searchParams: SearchPa
           </div>
           <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">Firmalar Haritası</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-300 md:text-base">
-            Firmalar Haritası - Sektörel Keşfetme deneyimiyle şehir ve sektör filtreleri arasında gezinin.
+            Firma üzerinde özel koordinat yoksa bağlı ilçe veya şehir merkezinin koordinatı kullanılır.
             İşaretçiye tıklayarak firma iletişim bilgilerine ve profile hızlıca ulaşın.
           </p>
         </div>

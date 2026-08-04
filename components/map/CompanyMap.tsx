@@ -9,7 +9,7 @@ import MapControls from "@/components/map/MapControls";
 import MapFilters from "@/components/map/MapFilters";
 import MapLegend from "@/components/map/MapLegend";
 import MapPopup from "@/components/map/MapPopup";
-import type { MapCompany, MappedCompany } from "@/components/map/types";
+import type { MapCompany, MappedCompany, TaxonomyNode } from "@/components/map/types";
 
 type CompanyMapProps = {
   companies: MapCompany[];
@@ -77,6 +77,26 @@ function parseCoordinate(value?: string | null, min = -180, max = 180) {
   }
 
   return parsed;
+}
+
+function getLocationCoordinate(locations?: Array<TaxonomyNode | null> | null) {
+  const candidates = (locations ?? [])
+    .map((location) => {
+      const lat = parseCoordinate(location?.locationDetails?.lat, -90, 90);
+      const lng = parseCoordinate(location?.locationDetails?.lng, -180, 180);
+      const type = location?.locationDetails?.type ?? "location";
+
+      if (lat === null || lng === null) {
+        return null;
+      }
+
+      const priority = type === "district" ? 3 : type === "city" ? 2 : 1;
+      return { lat, lng, priority, type };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => right.priority - left.priority);
+
+  return candidates[0] ?? null;
 }
 
 function getSectorOptions(companies: MappedCompany[]) {
@@ -154,14 +174,36 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
   const mappableCompanies = useMemo(() => {
     return companies
       .map((company) => {
-        const lat = parseCoordinate(company.companyDetails?.mapLat, -90, 90);
-        const lng = parseCoordinate(company.companyDetails?.mapLng, -180, 180);
+        const companyLat = parseCoordinate(company.companyDetails?.mapLat, -90, 90);
+        const companyLng = parseCoordinate(company.companyDetails?.mapLng, -180, 180);
 
-        if (lat === null || lng === null) {
+        if (companyLat !== null && companyLng !== null) {
+          return {
+            ...company,
+            lat: companyLat,
+            lng: companyLng,
+            coordinateSource: "company" as const,
+          } satisfies MappedCompany;
+        }
+
+        const locationCoordinate = getLocationCoordinate(company.locations?.nodes);
+        if (!locationCoordinate) {
           return null;
         }
 
-        return { ...company, lat, lng } satisfies MappedCompany;
+        const coordinateSource =
+          locationCoordinate.type === "district"
+            ? "district"
+            : locationCoordinate.type === "city"
+              ? "city"
+              : "location";
+
+        return {
+          ...company,
+          lat: locationCoordinate.lat,
+          lng: locationCoordinate.lng,
+          coordinateSource,
+        } satisfies MappedCompany;
       })
       .filter((company): company is MappedCompany => Boolean(company));
   }, [companies]);
@@ -275,7 +317,9 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
 
         {!filteredCompanies.length ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[500] border border-gray-200 bg-white/95 px-4 py-3 text-sm text-secondary shadow-lg lg:left-[336px]">
-            Seçili filtrelerle eşleşen konum bulunamadı.
+            {companies.length
+              ? "Firmalarda veya bağlı lokasyonlarda kullanılabilir koordinat bulunamadı."
+              : "Seçili filtrelerle eşleşen konum bulunamadı."}
           </div>
         ) : null}
 
