@@ -1,6 +1,11 @@
 export type TaxonomyNode = {
   name?: string | null;
   slug?: string | null;
+  locationDetails?: {
+    type?: string | null;
+    lat?: string | null;
+    lng?: string | null;
+  } | null;
 };
 
 export type MapCompany = {
@@ -32,4 +37,5 @@ export type MapCompany = {
 export type MappedCompany = MapCompany & {
   lat: number;
   lng: number;
+  coordinateSource: "company" | "district" | "city" | "location";
 };
