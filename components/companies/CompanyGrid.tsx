@@ -36,7 +36,7 @@ type CompanyGridProps = {
 
 export default function CompanyGrid({ companies, featured = false }: CompanyGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       {companies.map((company) => (
         <CompanyCard company={company} featured={featured} key={company.id} />
       ))}
