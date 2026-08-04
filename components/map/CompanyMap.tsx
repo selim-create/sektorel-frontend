@@ -10,6 +10,7 @@ import MapFilters from "@/components/map/MapFilters";
 import MapLegend from "@/components/map/MapLegend";
 import MapPopup from "@/components/map/MapPopup";
 import type { MapCompany, MappedCompany, TaxonomyNode } from "@/components/map/types";
+import { getTurkeyCityCenter } from "@/lib/turkey-city-centers";
 
 type CompanyMapProps = {
   companies: MapCompany[];
@@ -99,22 +100,31 @@ function getLocationCoordinate(locations?: Array<TaxonomyNode | null> | null) {
   return candidates[0] ?? null;
 }
 
+function getProvinceFallback(locations?: Array<TaxonomyNode | null> | null) {
+  const locationNodes = (locations ?? []).filter((location): location is TaxonomyNode => Boolean(location));
+  const cityNode = locationNodes.find((location) => location.locationDetails?.type === "city");
+  const coordinates = getTurkeyCityCenter(
+    cityNode?.slug,
+    cityNode?.name,
+    ...locationNodes.flatMap((location) => [location.slug, location.name]),
+  );
+
+  if (!coordinates) {
+    return null;
+  }
+
+  return { lat: coordinates[0], lng: coordinates[1] };
+}
+
 function getSectorOptions(companies: MappedCompany[]) {
   const map = new Map<string, FilterOption>();
 
   companies.forEach((company) => {
     (company.sectors?.nodes ?? []).forEach((sector) => {
-      if (!sector?.slug || !sector.name) {
-        return;
-      }
-
+      if (!sector?.slug || !sector.name) return;
       const existing = map.get(sector.slug);
-      if (existing) {
-        existing.count += 1;
-        return;
-      }
-
-      map.set(sector.slug, { slug: sector.slug, name: sector.name, count: 1 });
+      if (existing) existing.count += 1;
+      else map.set(sector.slug, { slug: sector.slug, name: sector.name, count: 1 });
     });
   });
 
@@ -126,17 +136,10 @@ function getLocationOptions(companies: MappedCompany[]) {
 
   companies.forEach((company) => {
     (company.locations?.nodes ?? []).forEach((location) => {
-      if (!location?.slug || !location.name) {
-        return;
-      }
-
+      if (!location?.slug || !location.name) return;
       const existing = map.get(location.slug);
-      if (existing) {
-        existing.count += 1;
-        return;
-      }
-
-      map.set(location.slug, { slug: location.slug, name: location.name, count: 1 });
+      if (existing) existing.count += 1;
+      else map.set(location.slug, { slug: location.slug, name: location.name, count: 1 });
     });
   });
 
@@ -151,9 +154,7 @@ function getSectorColorMap(options: FilterOption[]) {
 }
 
 function createMarkerIcon(color?: string) {
-  if (!color) {
-    return defaultIcon;
-  }
+  if (!color) return defaultIcon;
 
   return divIcon({
     className: "",
@@ -178,32 +179,19 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
         const companyLng = parseCoordinate(company.companyDetails?.mapLng, -180, 180);
 
         if (companyLat !== null && companyLng !== null) {
-          return {
-            ...company,
-            lat: companyLat,
-            lng: companyLng,
-            coordinateSource: "company" as const,
-          } satisfies MappedCompany;
+          return { ...company, lat: companyLat, lng: companyLng, coordinateSource: "company" as const } satisfies MappedCompany;
         }
 
         const locationCoordinate = getLocationCoordinate(company.locations?.nodes);
-        if (!locationCoordinate) {
-          return null;
+        if (locationCoordinate) {
+          const coordinateSource = locationCoordinate.type === "district" ? "district" : locationCoordinate.type === "city" ? "city" : "location";
+          return { ...company, lat: locationCoordinate.lat, lng: locationCoordinate.lng, coordinateSource } satisfies MappedCompany;
         }
 
-        const coordinateSource =
-          locationCoordinate.type === "district"
-            ? "district"
-            : locationCoordinate.type === "city"
-              ? "city"
-              : "location";
+        const provinceFallback = getProvinceFallback(company.locations?.nodes);
+        if (!provinceFallback) return null;
 
-        return {
-          ...company,
-          lat: locationCoordinate.lat,
-          lng: locationCoordinate.lng,
-          coordinateSource,
-        } satisfies MappedCompany;
+        return { ...company, lat: provinceFallback.lat, lng: provinceFallback.lng, coordinateSource: "city" as const } satisfies MappedCompany;
       })
       .filter((company): company is MappedCompany => Boolean(company));
   }, [companies]);
@@ -214,64 +202,38 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
 
   const filteredCompanies = useMemo(() => {
     return mappableCompanies.filter((company) => {
-      const sectorSlugs = (company.sectors?.nodes ?? [])
-        .map((item) => item?.slug)
-        .filter((slug): slug is string => Boolean(slug));
-      const locationSlugs = (company.locations?.nodes ?? [])
-        .map((item) => item?.slug)
-        .filter((slug): slug is string => Boolean(slug));
-      const matchesSector = !selectedSector || sectorSlugs.includes(selectedSector);
-      const matchesLocation = !selectedLocation || locationSlugs.includes(selectedLocation);
-      const matchesVerified = !verifiedOnly || Boolean(company.companyDetails?.isVerified);
-
-      return matchesSector && matchesLocation && matchesVerified;
+      const sectorSlugs = (company.sectors?.nodes ?? []).map((item) => item?.slug).filter((slug): slug is string => Boolean(slug));
+      const locationSlugs = (company.locations?.nodes ?? []).map((item) => item?.slug).filter((slug): slug is string => Boolean(slug));
+      return (!selectedSector || sectorSlugs.includes(selectedSector)) &&
+        (!selectedLocation || locationSlugs.includes(selectedLocation)) &&
+        (!verifiedOnly || Boolean(company.companyDetails?.isVerified));
     });
   }, [mappableCompanies, selectedLocation, selectedSector, verifiedOnly]);
 
-  const points = useMemo<Array<[number, number]>>(
-    () => filteredCompanies.map((company) => [company.lat, company.lng]),
-    [filteredCompanies],
-  );
-
-  const legendItems = useMemo(
-    () =>
-      sectorOptions.map((sector) => ({
-        key: sector.slug,
-        name: sector.name,
-        color: sectorColorMap[sector.slug] ?? "#ea580c",
-      })),
-    [sectorColorMap, sectorOptions],
-  );
+  const points = useMemo<Array<[number, number]>>(() => filteredCompanies.map((company) => [company.lat, company.lng]), [filteredCompanies]);
+  const legendItems = useMemo(() => sectorOptions.map((sector) => ({ key: sector.slug, name: sector.name, color: sectorColorMap[sector.slug] ?? "#ea580c" })), [sectorColorMap, sectorOptions]);
 
   useEffect(() => {
     const params = new URLSearchParams();
-
-    if (selectedSector) {
-      params.set("sector", selectedSector);
-    }
-
-    if (selectedLocation) {
-      params.set("location", selectedLocation);
-    }
-
-    if (verifiedOnly) {
-      params.set("verified", "true");
-    }
-
+    if (selectedSector) params.set("sector", selectedSector);
+    if (selectedLocation) params.set("location", selectedLocation);
+    if (verifiedOnly) params.set("verified", "true");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [pathname, router, selectedLocation, selectedSector, verifiedOnly]);
+
+  const clearFilters = () => {
+    setSelectedLocation("");
+    setSelectedSector("");
+    setVerifiedOnly(false);
+  };
 
   return (
     <div className="grid min-h-[70vh] gap-0 border border-gray-200 bg-white lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="hidden lg:block">
         <MapFilters
           locations={locationOptions}
-          onClear={() => {
-            setSelectedLocation("");
-            setSelectedSector("");
-            setVerifiedOnly(false);
-          }}
+          onClear={clearFilters}
           onLocationSelect={(slug) => setSelectedLocation(slug ?? "")}
           onSectorSelect={(slug) => setSelectedSector(slug ?? "")}
           onVerifiedToggle={() => setVerifiedOnly((current) => !current)}
@@ -286,27 +248,16 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
 
       <div className="relative min-h-[70vh]">
         <MapContainer center={TURKEY_CENTER} className="h-full w-full" zoom={DEFAULT_ZOOM}>
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <FitMapBounds points={points} />
           <MapControls />
-
           <MarkerClusterGroup chunkedLoading>
             {filteredCompanies.map((company) => {
               const sectorSlug = company.sectors?.nodes?.find((item) => item?.slug)?.slug;
               const markerColor = sectorSlug ? sectorColorMap[sectorSlug] : undefined;
-
               return (
-                <Marker
-                  icon={createMarkerIcon(markerColor)}
-                  key={company.id}
-                  position={[company.lat, company.lng]}
-                >
-                  <Popup minWidth={250}>
-                    <MapPopup company={company} />
-                  </Popup>
+                <Marker icon={createMarkerIcon(markerColor)} key={company.id} position={[company.lat, company.lng]}>
+                  <Popup minWidth={250}><MapPopup company={company} /></Popup>
                 </Marker>
               );
             })}
@@ -317,18 +268,12 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
 
         {!filteredCompanies.length ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[500] border border-gray-200 bg-white/95 px-4 py-3 text-sm text-secondary shadow-lg lg:left-[336px]">
-            {companies.length
-              ? "Firmalarda veya bağlı lokasyonlarda kullanılabilir koordinat bulunamadı."
-              : "Seçili filtrelerle eşleşen konum bulunamadı."}
+            {companies.length ? "Firmaların bağlı olduğu şehir bilgisi veya kullanılabilir koordinatı bulunamadı." : "Seçili filtrelerle eşleşen konum bulunamadı."}
           </div>
         ) : null}
 
         <div className="absolute left-3 top-3 z-[500] lg:hidden">
-          <button
-            className="border border-gray-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-secondary shadow-lg"
-            onClick={() => setMobileFiltersOpen((current) => !current)}
-            type="button"
-          >
+          <button className="border border-gray-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-secondary shadow-lg" onClick={() => setMobileFiltersOpen((current) => !current)} type="button">
             Filtreler ({filteredCompanies.length})
           </button>
         </div>
@@ -337,11 +282,7 @@ export default function CompanyMap({ companies, initialFilters }: CompanyMapProp
           <div className="absolute inset-x-0 bottom-0 z-[600] max-h-[70vh] overflow-y-auto border-t border-gray-200 bg-white lg:hidden">
             <MapFilters
               locations={locationOptions}
-              onClear={() => {
-                setSelectedLocation("");
-                setSelectedSector("");
-                setVerifiedOnly(false);
-              }}
+              onClear={clearFilters}
               onLocationSelect={(slug) => setSelectedLocation(slug ?? "")}
               onSectorSelect={(slug) => setSelectedSector(slug ?? "")}
               onVerifiedToggle={() => setVerifiedOnly((current) => !current)}
