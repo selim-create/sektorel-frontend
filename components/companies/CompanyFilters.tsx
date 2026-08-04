@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2, Filter } from "lucide-react";
+import LocationSearchFilter from "@/components/companies/LocationSearchFilter";
 
 type FilterOption = {
   slug: string;
@@ -9,9 +10,9 @@ type FilterOption = {
 
 type CompanyFiltersProps = {
   sectors: FilterOption[];
-  locations: FilterOption[];
   selectedSector?: string;
   selectedLocation?: string;
+  selectedLocationName?: string;
   selectedSort?: string;
   selectedVerified?: string;
   searchQuery?: string;
@@ -33,15 +34,16 @@ function buildHref(
     params.set(key, value);
   });
 
+  params.delete("page");
   const query = params.toString();
   return query ? `/firmalar?${query}` : "/firmalar";
 }
 
 export default function CompanyFilters({
   sectors,
-  locations,
   selectedSector,
   selectedLocation,
+  selectedLocationName,
   selectedSort,
   selectedVerified,
   searchQuery,
@@ -54,7 +56,6 @@ export default function CompanyFilters({
     ...(selectedVerified ? { verified: selectedVerified } : {}),
     ...(searchQuery ? { q: searchQuery } : {}),
   };
-  const totalLocationCount = locations.reduce((sum, location) => sum + location.count, 0);
 
   return (
     <aside className="space-y-6 border border-gray-200 bg-white p-6 shadow-sm">
@@ -71,26 +72,24 @@ export default function CompanyFilters({
 
       <div>
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Doğrulama</p>
-        <div className="space-y-2">
-          <Link
-            className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
-              selectedVerified === "true"
-                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                : "border-gray-200 text-secondary hover:border-primary"
-            }`}
-            href={buildHref(currentParams, { verified: selectedVerified === "true" ? undefined : "true" })}
-          >
-            <span className="inline-flex items-center gap-2">
-              <CheckCircle2 size={14} /> Onaylı Firmalar
-            </span>
-            <span>{selectedVerified === "true" ? "Açık" : "Kapalı"}</span>
-          </Link>
-        </div>
+        <Link
+          className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
+            selectedVerified === "true"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              : "border-gray-200 text-secondary hover:border-primary"
+          }`}
+          href={buildHref(currentParams, { verified: selectedVerified === "true" ? undefined : "true" })}
+        >
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 size={14} /> Onaylı Firmalar
+          </span>
+          <span>{selectedVerified === "true" ? "Açık" : "Kapalı"}</span>
+        </Link>
       </div>
 
       <div>
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Sektör</p>
-        <div className="space-y-2">
+        <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
           {sectors.map((sector) => (
             <Link
               className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
@@ -98,11 +97,13 @@ export default function CompanyFilters({
                   ? "border-primary bg-orange-50 text-primary"
                   : "border-gray-200 text-secondary hover:border-primary"
               }`}
-              href={buildHref(currentParams, { sector: selectedSector === sector.slug ? undefined : sector.slug })}
+              href={buildHref(currentParams, {
+                sector: selectedSector === sector.slug ? undefined : sector.slug,
+              })}
               key={sector.slug}
             >
-              <span>{sector.name}</span>
-              <span className="text-xs text-gray-500">{sector.count}</span>
+              <span className="truncate">{sector.name}</span>
+              <span className="ml-2 text-xs text-gray-500">{sector.count}</span>
             </Link>
           ))}
         </div>
@@ -110,40 +111,11 @@ export default function CompanyFilters({
 
       <div>
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Şehir</p>
-        <div className="space-y-2">
-          <Link
-            className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
-              !selectedLocation
-                ? "border-primary bg-orange-50 text-primary"
-                : "border-gray-200 text-secondary hover:border-primary"
-            }`}
-            href={buildHref(currentParams, { location: undefined })}
-          >
-            <span>Türkiye Geneli</span>
-            <span className="text-xs text-gray-500">{totalLocationCount}</span>
-          </Link>
-          {locations.map((location) => (
-            <Link
-              className={`flex items-center justify-between border px-3 py-2 text-sm transition-colors ${
-                selectedLocation === location.slug
-                  ? "border-primary bg-orange-50 text-primary"
-                  : "border-gray-200 text-secondary hover:border-primary"
-              }`}
-              href={buildHref(currentParams, {
-                location: selectedLocation === location.slug ? undefined : location.slug,
-              })}
-              key={location.slug}
-            >
-              <span>{location.name}</span>
-              <span className="text-xs text-gray-500">{location.count}</span>
-            </Link>
-          ))}
-          {!locations.length ? (
-            <p className="border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-500">
-              Şehir verisi bulunamadı. Türkiye geneli sonuçları gösteriliyor.
-            </p>
-          ) : null}
-        </div>
+        <LocationSearchFilter
+          currentParams={currentParams}
+          selectedLocation={selectedLocation}
+          selectedLocationName={selectedLocationName}
+        />
       </div>
 
       <Link
