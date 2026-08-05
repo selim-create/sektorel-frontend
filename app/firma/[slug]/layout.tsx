@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
-import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import JsonLd from "@/components/seo/JsonLd";
 import { queryWithFallback } from "@/lib/graphql-client";
 import {
@@ -230,13 +229,6 @@ export default async function CompanyLayout({
   return (
     <>
       <JsonLd data={[localBusinessSchema, breadcrumbSchema]} />
-      <Breadcrumbs
-        items={[
-          { label: "Ana Sayfa", href: "/" },
-          { label: "Firma Rehberi", href: "/firmalar" },
-          { label: company.title },
-        ]}
-      />
       {children}
     </>
   );
