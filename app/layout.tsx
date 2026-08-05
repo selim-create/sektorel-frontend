@@ -18,13 +18,9 @@ export const metadata: Metadata = {
   description:
     "Türkiye genelindeki firmaları, sektörleri, haberleri, etkinlikleri, ticari fırsatları ve iş ilanlarını keşfedin.",
   applicationName: SITE_NAME,
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     type: "website",
     locale: "tr_TR",
-    url: "/",
     siteName: SITE_NAME,
     title: "Sektörel Ajanda | Türkiye'nin İş Platformu",
     description:
