@@ -45,12 +45,21 @@ async function parseRestError(response: Response) {
   }
 }
 
+function proxiedCvUrl(applicationUrl: string, view: boolean) {
+  const match = applicationUrl.match(/\/job-applications\/(\d+)\/cv(?:-v2)?(?:\?.*)?$/);
+  if (!match?.[1]) {
+    throw new Error("CV bağlantısı geçersiz.");
+  }
+
+  const params = view ? "?view=1" : "";
+  return `/api/job-applications/${match[1]}/cv${params}`;
+}
+
 async function fetchProtectedCv(url: string, view = false) {
   const token = await getValidAccessToken();
   if (!token) throw new Error("Oturum doğrulanamadı. Lütfen yeniden giriş yapın.");
 
-  const endpoint = view ? `${url}${url.includes("?") ? "&" : "?"}view=1` : url;
-  const response = await fetch(endpoint, {
+  const response = await fetch(proxiedCvUrl(url, view), {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
