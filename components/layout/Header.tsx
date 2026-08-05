@@ -1,38 +1,42 @@
 "use client";
 
-import { useState, useEffect, useRef, type FormEvent } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter, usePathname } from "next/navigation";
-import { 
-  Search, Menu, X, MapPin, 
-  Briefcase, Calendar, FileText, 
-  Users, TrendingUp, ChevronDown,
-  LayoutDashboard, LogOut, User,
-  Bell, Building2,
-  // Yeni Sektör İkonları
-  Cpu, Globe, Car, Shirt, Zap, Wheat, Settings, Lightbulb, Truck, 
-  Armchair, Stethoscope, Plane, FlaskConical, Package, Hammer, 
-  ShoppingBag, Megaphone, GraduationCap, Landmark
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Armchair,
+  Briefcase,
+  Building2,
+  Car,
+  ChevronDown,
+  Cpu,
+  FlaskConical,
+  Globe,
+  GraduationCap,
+  Hammer,
+  Landmark,
+  LayoutDashboard,
+  Lightbulb,
+  LogOut,
+  MapPin,
+  Megaphone,
+  Menu,
+  Package,
+  Plane,
+  Plus,
+  Settings,
+  Shirt,
+  ShoppingBag,
+  Stethoscope,
+  Truck,
+  User,
+  Wheat,
+  X,
+  Zap,
 } from "lucide-react";
+import HeaderSearch from "@/components/search/HeaderSearch";
 
-// Türkçe karakter uyumlu Slug Oluşturucu
-const slugify = (text: string) => {
-  const trMap: { [key: string]: string } = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'Ç': 'c', 'Ğ': 'g', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u'
-  };
-  
-  return text
-    .replace(/[çğıİöşüÇĞIÖŞÜ]/g, (match) => trMap[match]) // Türkçe karakterleri değiştir
-    .toLowerCase()
-    .replace(/&/g, 'and') // & işaretini 'and' yap
-    .replace(/[^a-z0-9\s-]/g, '') // Alfanümerik olmayanları sil
-    .trim()
-    .replace(/\s+/g, '-'); // Boşlukları tire yap
-};
-
-// Gerçek Ana Sektörler Listesi (Excel Verisine Uygun)
 const MAIN_SECTORS = [
   { name: "İnşaat, Yapı & Gayrimenkul", icon: Building2, color: "text-orange-600", bg: "bg-orange-50", slug: "insaat-yapi-and-gayrimenkul" },
   { name: "Bilişim, Teknoloji & Telekom", icon: Cpu, color: "text-blue-500", bg: "bg-blue-50", slug: "bilisim-teknoloji-and-telekom" },
@@ -62,48 +66,34 @@ export default function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{name: string} | null>(null);
-  const [desktopSearchQuery, setDesktopSearchQuery] = useState("");
-  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
-  const [isDesktopSearchFocused, setIsDesktopSearchFocused] = useState(false);
-  
-  // Sektörler Mega Menü Kontrolü
+  const [user, setUser] = useState<{ name: string } | null>(null);
   const [isMegaMenuOpen, setIsMegaMenuOpen] = useState(false);
   const desktopSearchRef = useRef<HTMLInputElement>(null);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
 
-  // Auth Durumunu Kontrol Et
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       const token = localStorage.getItem("authToken");
       const userData = localStorage.getItem("user");
-      
-      if (token && userData) {
-        setIsLoggedIn(true);
-        try {
-          setUser(JSON.parse(userData));
-        } catch (e) {
-          console.error("User data parse error", e);
-        }
-      } else {
+
+      if (!token || !userData) {
         setIsLoggedIn(false);
+        setUser(null);
+        return;
+      }
+
+      setIsLoggedIn(true);
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error("User data parse error", error);
         setUser(null);
       }
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pathname]); // Sayfa değişiminde de kontrol et
+  }, [pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
-    setIsLoggedIn(false);
-    setUser(null);
-    router.push("/giris");
-    router.refresh();
-  };
-
-  // Sayfa değişince mobil menüyü kapat
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setIsMobileMenuOpen(false);
@@ -115,298 +105,229 @@ export default function Header() {
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-
-        if (window.innerWidth >= 1024) {
-          desktopSearchRef.current?.focus();
-          return;
-        }
-
-        setIsMobileMenuOpen(true);
-        window.setTimeout(() => mobileSearchRef.current?.focus(), 0);
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
+        return;
       }
+
+      event.preventDefault();
+
+      if (window.innerWidth >= 1024) {
+        desktopSearchRef.current?.focus();
+        return;
+      }
+
+      setIsMobileMenuOpen(true);
+      window.setTimeout(() => mobileSearchRef.current?.focus(), 0);
     }
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
   }, []);
 
-  const submitSearch = (rawQuery: string) => {
-    const query = rawQuery.trim();
-    if (!query) return;
-
-    setDesktopSearchQuery("");
-    setMobileSearchQuery("");
-    setIsMobileMenuOpen(false);
-    router.push(`/ara?q=${encodeURIComponent(query)}`);
-  };
-
-  const handleDesktopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    submitSearch(desktopSearchQuery);
-  };
-
-  const handleMobileSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    submitSearch(mobileSearchQuery);
-  };
+  function handleLogout() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
+    setIsLoggedIn(false);
+    setUser(null);
+    router.push("/giris");
+    router.refresh();
+  }
 
   return (
-    <header className="flex flex-col w-full border-b border-gray-200 bg-white sticky top-0 z-50 font-sans shadow-sm">
-      
-      {/* 1. TOP BAR (Siyah İnce Bant) */}
-      <div className="bg-secondary text-gray-300 text-[11px] h-9 flex items-center justify-between px-4 lg:px-12 tracking-wide transition-colors relative z-50">
-        <div className="hidden md:flex gap-4 items-center">
+    <header className="sticky top-0 z-50 flex w-full flex-col border-b border-gray-200 bg-white font-sans shadow-sm">
+      <div className="relative z-50 flex h-9 items-center justify-between bg-secondary px-4 text-[11px] tracking-wide text-gray-300 transition-colors lg:px-12">
+        <div className="hidden items-center gap-4 md:flex">
           <span className="opacity-80">Türkiye&#39;nin En Kapsamlı Sektörel Ajandası</span>
-          <span className="w-px h-3 bg-gray-700"></span>
-          <Link href="/hakkimizda" className="hover:text-white transition">Hakkımızda</Link>
-          <Link href="/iletisim" className="hover:text-white transition">İletişim</Link>
+          <span className="h-3 w-px bg-gray-700" />
+          <Link className="transition hover:text-white" href="/hakkimizda">Hakkımızda</Link>
+          <Link className="transition hover:text-white" href="/iletisim">İletişim</Link>
         </div>
-        
-        {/* SAĞ: AUTH DURUMU */}
-        <div className="flex items-center gap-4 ml-auto w-full md:w-auto justify-end">
+
+        <div className="ml-auto flex w-full items-center justify-end gap-4 md:w-auto">
           {isLoggedIn ? (
-             <>
-               <span className="hidden sm:inline">Hoş geldin, <span className="text-white font-bold">{user?.name}</span></span>
-               <span className="hidden sm:inline text-gray-600">|</span>
-               <Link href="/hesabim" className="hover:text-primary transition flex items-center gap-1 text-white font-semibold">
-                  <LayoutDashboard size={12} /> Yönetim Paneli
-               </Link>
-               <span className="text-gray-600">|</span>
-               <button onClick={handleLogout} className="hover:text-red-400 transition flex items-center gap-1">
-                  <LogOut size={12} /> Çıkış
-               </button>
-             </>
+            <>
+              <span className="hidden sm:inline">
+                Hoş geldin, <span className="font-bold text-white">{user?.name}</span>
+              </span>
+              <span className="hidden text-gray-600 sm:inline">|</span>
+              <Link className="flex items-center gap-1 font-semibold text-white transition hover:text-primary" href="/hesabim">
+                <LayoutDashboard size={12} /> Yönetim Paneli
+              </Link>
+              <span className="text-gray-600">|</span>
+              <button className="flex items-center gap-1 transition hover:text-red-400" onClick={handleLogout} type="button">
+                <LogOut size={12} /> Çıkış
+              </button>
+            </>
           ) : (
-             <>
-               <Link href="/giris" className="hover:text-primary transition font-semibold text-white flex items-center gap-1">
-                 <User size={12} /> Giriş Yap
-               </Link>
-               <span className="text-gray-600">|</span>
-               <Link href="/kayit" className="hover:text-white transition">Kayıt Ol</Link>
-             </>
+            <>
+              <Link className="flex items-center gap-1 font-semibold text-white transition hover:text-primary" href="/giris">
+                <User size={12} /> Giriş Yap
+              </Link>
+              <span className="text-gray-600">|</span>
+              <Link className="transition hover:text-white" href="/kayit">Kayıt Ol</Link>
+            </>
           )}
         </div>
       </div>
 
-      {/* 2. BRAND & SEARCH BAR (Orta Katman) */}
-      <div className="bg-white py-4 px-4 lg:px-12 flex items-center justify-between gap-8 border-b border-gray-100 relative z-40">
-        
-        {/* LOGO */}
-        <Link href="/" className="flex-shrink-0">
+      <div className="relative z-40 flex items-center justify-between gap-8 border-b border-gray-100 bg-white px-4 py-4 lg:px-12">
+        <Link className="shrink-0" href="/">
           <Image
-            src="/sektorel-ajanda-logo.svg" 
             alt="Sektörel Ajanda"
-            width={220}
-            height={50}
             className="h-9 w-auto"
+            height={50}
             priority
+            src="/sektorel-ajanda-logo.svg"
+            width={220}
           />
         </Link>
 
-        {/* ORTA: ARAMA (Desktop) */}
-        <form onSubmit={handleDesktopSearchSubmit} className="hidden lg:flex flex-1 max-w-2xl relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
-          </div>
-          <input
-            ref={desktopSearchRef}
-            type="search"
-            value={desktopSearchQuery}
-            onChange={(event) => setDesktopSearchQuery(event.target.value)}
-            onFocus={() => setIsDesktopSearchFocused(true)}
-            onBlur={() => setIsDesktopSearchFocused(false)}
-            placeholder="Firma, sektör, haber veya etkinlik ara..."
-            className={`w-full pl-10 pr-32 py-3 bg-gray-50 border text-sm focus:outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all rounded-none placeholder:text-gray-400 ${
-              isDesktopSearchFocused ? "border-primary bg-white" : "border-gray-200"
-            }`}
-          />
-          <div className="absolute inset-y-1 right-1">
-            <button type="submit" className="h-full px-6 bg-secondary text-white text-xs font-bold hover:bg-black transition-colors uppercase tracking-wider">
-              ARA
-            </button>
-          </div>
-        </form>
+        <HeaderSearch ref={desktopSearchRef} variant="desktop" />
 
-        {/* SAĞ: CTA (Firma Ekle) */}
-        <div className="hidden lg:flex items-center gap-3">
-          <Link 
-            href="/firma-ekle" 
-            className="px-6 py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold tracking-wide transition-transform hover:-translate-y-0.5 shadow-sm uppercase flex items-center gap-2"
+        <div className="hidden items-center gap-3 lg:flex">
+          <Link
+            className="flex items-center gap-2 bg-primary px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-primary-hover"
+            href="/firma-ekle"
           >
-            <PlusIcon size={16} /> Firma Ekle
+            <Plus size={16} strokeWidth={3} /> Firma Ekle
           </Link>
         </div>
 
-        {/* MOBİL MENÜ BUTONU */}
-        <button 
-          className="lg:hidden text-secondary p-2 hover:bg-gray-50 transition-colors"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        <button
+          aria-label={isMobileMenuOpen ? "Menüyü kapat" : "Menüyü aç"}
+          className="p-2 text-secondary transition-colors hover:bg-gray-50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen((current) => !current)}
+          type="button"
         >
           {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 
-      {/* 3. NAVIGATION BAR (Alt Katman - Ana Menü) */}
-      <div className="hidden lg:block bg-white border-b border-gray-200 relative z-30">
+      <div className="relative z-30 hidden border-b border-gray-200 bg-white lg:block">
         <div className="px-4 lg:px-12">
-          <nav className="flex items-center gap-1 text-sm font-bold text-secondary uppercase tracking-tight h-12">
-            
-            {/* Mega Menu Trigger */}
-            <div 
+          <nav className="flex h-12 items-center gap-1 text-sm font-bold uppercase tracking-tight text-secondary">
+            <div
               className="group h-full"
               onMouseEnter={() => setIsMegaMenuOpen(true)}
               onMouseLeave={() => setIsMegaMenuOpen(false)}
             >
-              <Link 
-                href="/sektorler" 
-                className={`h-full flex items-center px-4 border-b-2 transition-colors gap-1 ${isMegaMenuOpen ? 'border-primary text-primary bg-gray-50' : 'border-transparent hover:text-primary'}`}
+              <Link
+                className={`flex h-full items-center gap-1 border-b-2 px-4 transition-colors ${
+                  isMegaMenuOpen
+                    ? "border-primary bg-gray-50 text-primary"
+                    : "border-transparent hover:text-primary"
+                }`}
+                href="/sektorler"
               >
-                Sektörler <ChevronDown size={14} className={`transition-transform ${isMegaMenuOpen ? 'rotate-180' : ''}`} />
+                Sektörler
+                <ChevronDown className={`transition-transform ${isMegaMenuOpen ? "rotate-180" : ""}`} size={14} />
               </Link>
-              
-              {/* MEGA MENU DROPDOWN - YENİLENDİ */}
-              {isMegaMenuOpen && (
-                <div className="absolute top-full left-0 w-full bg-white border-t border-gray-200 shadow-xl py-8 px-12 z-50 animate-in fade-in slide-in-from-top-2 duration-200 max-h-[80vh] overflow-y-auto">
-                   <div className="container mx-auto">
-                      <div className="flex justify-between items-end mb-6 border-b border-gray-100 pb-4">
-                         <div>
-                           <h3 className="text-xl font-black text-secondary uppercase tracking-tight">Tüm Sektörler</h3>
-                           <p className="text-xs text-gray-500 mt-1">Sektörel Ajanda rehberindeki ana kategoriler.</p>
-                         </div>
-                         <Link href="/sektorler" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                           Tümünü Gör <ChevronDown size={12} className="-rotate-90" />
-                         </Link>
+
+              {isMegaMenuOpen ? (
+                <div className="absolute left-0 top-full z-50 max-h-[80vh] w-full overflow-y-auto border-t border-gray-200 bg-white px-12 py-8 shadow-xl">
+                  <div className="container mx-auto">
+                    <div className="mb-6 flex items-end justify-between border-b border-gray-100 pb-4">
+                      <div>
+                        <h3 className="text-xl font-black uppercase tracking-tight text-secondary">Tüm Sektörler</h3>
+                        <p className="mt-1 text-xs text-gray-500">Sektörel Ajanda rehberindeki ana kategoriler.</p>
                       </div>
-                      
-                      <div className="grid grid-cols-4 gap-x-6 gap-y-6">
-                         {MAIN_SECTORS.map((sector, i) => (
-                           <Link 
-                             key={i} 
-                             href={`/sektor/${sector.slug}`} 
-                             className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group border border-transparent hover:border-gray-100"
-                           >
-                             <div className={`w-10 h-10 flex items-center justify-center rounded-md ${sector.bg} ${sector.color} group-hover:scale-110 transition-transform`}>
-                               <sector.icon size={20} />
-                             </div>
-                             <div>
-                               <span className="text-xs font-bold text-gray-700 block group-hover:text-primary transition-colors leading-tight">
-                                 {sector.name}
-                               </span>
-                             </div>
-                           </Link>
-                         ))}
-                      </div>
-                   </div>
+                      <Link className="flex items-center gap-1 text-xs font-bold text-primary hover:underline" href="/sektorler">
+                        Tümünü Gör <ChevronDown className="-rotate-90" size={12} />
+                      </Link>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-x-6 gap-y-6">
+                      {MAIN_SECTORS.map((sector) => {
+                        const Icon = sector.icon;
+
+                        return (
+                          <Link
+                            className="group flex items-center gap-3 rounded-lg border border-transparent p-3 transition-colors hover:border-gray-100 hover:bg-gray-50"
+                            href={`/sektor/${sector.slug}`}
+                            key={sector.slug}
+                          >
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform group-hover:scale-110 ${sector.bg} ${sector.color}`}>
+                              <Icon size={20} />
+                            </div>
+                            <span className="block text-xs font-bold leading-tight text-gray-700 transition-colors group-hover:text-primary">
+                              {sector.name}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              )}
+              ) : null}
             </div>
 
-            <Link href="/firmalar" className="h-full flex items-center px-4 border-b-2 border-transparent hover:border-primary hover:text-primary transition-colors hover:bg-gray-50">
-              Firma Rehberi
-            </Link>
+            <Link className="flex h-full items-center border-b-2 border-transparent px-4 transition-colors hover:border-primary hover:bg-gray-50 hover:text-primary" href="/firmalar">Firma Rehberi</Link>
+            <Link className="flex h-full items-center border-b-2 border-transparent px-4 transition-colors hover:border-primary hover:bg-gray-50 hover:text-primary" href="/haberler">Haberler</Link>
+            <Link className="flex h-full items-center border-b-2 border-transparent px-4 transition-colors hover:border-primary hover:bg-gray-50 hover:text-primary" href="/ajanda">Etkinlikler</Link>
+            <Link className="flex h-full items-center border-b-2 border-transparent px-4 transition-colors hover:border-primary hover:bg-gray-50 hover:text-primary" href="/firsatlar">Fırsatlar</Link>
+            <Link className="flex h-full items-center border-b-2 border-transparent px-4 transition-colors hover:border-primary hover:bg-gray-50 hover:text-primary" href="/kariyer">İK &amp; Kariyer</Link>
 
-            <Link href="/haberler" className="h-full flex items-center px-4 border-b-2 border-transparent hover:border-primary hover:text-primary transition-colors hover:bg-gray-50">
-              Haberler
-            </Link>
-            
-            <Link href="/ajanda" className="h-full flex items-center px-4 border-b-2 border-transparent hover:border-primary hover:text-primary transition-colors gap-1 hover:bg-gray-50">
-              Etkinlikler
-            </Link>
-
-            <Link href="/firsatlar" className="h-full flex items-center px-4 border-b-2 border-transparent hover:border-primary hover:text-primary transition-colors hover:bg-gray-50">
-              Fırsatlar
-            </Link>
-            
-            <Link href="/kariyer" className="h-full flex items-center px-4 border-b-2 border-transparent hover:border-primary hover:text-primary transition-colors hover:bg-gray-50">
-              İK & Kariyer
-            </Link>
-            
-            <Link href="/harita" className="ml-auto flex items-center gap-2 text-gray-500 hover:text-secondary font-bold text-xs normal-case bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200 hover:border-gray-300 transition-all">
+            <Link className="ml-auto flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs font-bold normal-case text-gray-500 transition-all hover:border-gray-300 hover:text-secondary" href="/harita">
               <MapPin size={14} /> Haritada Keşfet
             </Link>
           </nav>
         </div>
       </div>
 
-      {/* MOBİL MENÜ (Overlay) */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-white lg:hidden flex flex-col animate-in slide-in-from-right duration-300">
-          
-          {/* Mobil Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-             <span className="font-black text-lg text-secondary">MENÜ</span>
-             <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
-               <X size={24} className="text-secondary"/>
-             </button>
+      {isMobileMenuOpen ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
+          <div className="flex items-center justify-between border-b border-gray-200 p-4">
+            <span className="text-lg font-black text-secondary">MENÜ</span>
+            <button
+              aria-label="Menüyü kapat"
+              className="rounded-full bg-gray-100 p-2 hover:bg-gray-200"
+              onClick={() => setIsMobileMenuOpen(false)}
+              type="button"
+            >
+              <X className="text-secondary" size={24} />
+            </button>
           </div>
 
-          {/* Menü Linkleri */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            
-            {/* Arama (Mobil) */}
-            <form onSubmit={handleMobileSearchSubmit} className="relative mb-6">
-               <input
-                 ref={mobileSearchRef}
-                 type="search"
-                 value={mobileSearchQuery}
-                 onChange={(event) => setMobileSearchQuery(event.target.value)}
-                 placeholder="Ara..."
-                 className="w-full bg-gray-50 border border-gray-200 p-3 pl-10 pr-20 text-sm rounded-none focus:border-primary outline-none"
-               />
-               <Search className="absolute left-3 top-3.5 text-gray-400" size={16}/>
-               <button
-                 type="submit"
-                 className="absolute inset-y-1 right-1 px-4 bg-secondary text-white text-xs font-bold uppercase tracking-wider"
-               >
-                 Ara
-               </button>
-            </form>
+          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <HeaderSearch
+              onNavigate={() => setIsMobileMenuOpen(false)}
+              ref={mobileSearchRef}
+              variant="mobile"
+            />
 
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Keşfet</p>
-            <Link href="/sektorler" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Sektörler</Link>
-            <Link href="/firmalar" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Firmalar</Link>
-            <Link href="/harita" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Harita</Link>
-            <Link href="/firsatlar" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Ticari Fırsatlar</Link>
-            <Link href="/ajanda" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Etkinlikler</Link>
-            <Link href="/haberler" className="block py-3 px-4 border-l-4 border-transparent hover:border-primary hover:bg-gray-50 font-bold text-secondary text-lg">Haberler</Link>
-            
-            <div className="mt-8 pt-8 border-t border-gray-100">
-               {isLoggedIn ? (
-                 <div className="space-y-3">
-                    <div className="flex items-center gap-3 px-4 mb-4">
-                       <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold text-lg">
-                          {user?.name?.charAt(0).toUpperCase()}
-                       </div>
-                       <div>
-                          <span className="block font-bold text-secondary">{user?.name}</span>
-                          <span className="text-xs text-gray-500">Üye Hesabı</span>
-                       </div>
+            <p className="mb-2 text-xs font-bold uppercase text-gray-400">Keşfet</p>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/sektorler">Sektörler</Link>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/firmalar">Firmalar</Link>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/harita">Harita</Link>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/firsatlar">Ticari Fırsatlar</Link>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/ajanda">Etkinlikler</Link>
+            <Link className="block border-l-4 border-transparent px-4 py-3 text-lg font-bold text-secondary hover:border-primary hover:bg-gray-50" href="/haberler">Haberler</Link>
+
+            <div className="mt-8 border-t border-gray-100 pt-8">
+              {isLoggedIn ? (
+                <div className="space-y-3">
+                  <div className="mb-4 flex items-center gap-3 px-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-bold text-white">
+                      {user?.name?.charAt(0).toUpperCase()}
                     </div>
-                    <Link href="/hesabim" className="block w-full bg-secondary text-white text-center py-3 font-bold uppercase">Yönetim Paneli</Link>
-                    <button onClick={handleLogout} className="block w-full border border-gray-200 text-secondary text-center py-3 font-bold uppercase hover:bg-red-50 hover:text-red-600 hover:border-red-200">Çıkış Yap</button>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-2 gap-4">
-                    <Link href="/giris" className="border border-gray-300 text-secondary py-3 text-center font-bold uppercase hover:bg-gray-50">Giriş Yap</Link>
-                    <Link href="/kayit" className="bg-primary text-white py-3 text-center font-bold uppercase hover:bg-primary-hover">Kayıt Ol</Link>
-                 </div>
-               )}
+                    <div>
+                      <span className="block font-bold text-secondary">{user?.name}</span>
+                      <span className="text-xs text-gray-500">Üye Hesabı</span>
+                    </div>
+                  </div>
+                  <Link className="block w-full bg-secondary py-3 text-center font-bold uppercase text-white" href="/hesabim">Yönetim Paneli</Link>
+                  <button className="block w-full border border-gray-200 py-3 text-center font-bold uppercase text-secondary hover:border-red-200 hover:bg-red-50 hover:text-red-600" onClick={handleLogout} type="button">Çıkış Yap</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <Link className="border border-gray-300 py-3 text-center font-bold uppercase text-secondary hover:bg-gray-50" href="/giris">Giriş Yap</Link>
+                  <Link className="bg-primary py-3 text-center font-bold uppercase text-white hover:bg-primary-hover" href="/kayit">Kayıt Ol</Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </header>
-  );
-}
-
-// İkon Helper
-function PlusIcon({ size }: { size: number }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14" />
-      <path d="M12 5v14" />
-    </svg>
   );
 }
