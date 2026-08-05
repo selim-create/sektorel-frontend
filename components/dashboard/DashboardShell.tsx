@@ -15,6 +15,8 @@ import {
   User,
   Building2,
   Calendar,
+  ClipboardList,
+  UsersRound,
 } from "lucide-react";
 import {
   clearSession,
@@ -67,6 +69,8 @@ const companyRoleLabels: Record<string, string> = {
   viewer: "Firma Görüntüleyicisi",
 };
 
+const navClass = "flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group";
+
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [fallbackUser, setFallbackUser] = useState<SessionUser | null>(null);
@@ -85,6 +89,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const company = profile?.company;
   const companyRole = profile?.companyRole || "";
   const isOwner = companyRole === "owner";
+  const canManageCompanyContent = companyRole === "owner" || companyRole === "editor";
   const displayName = company?.title || profile?.displayName || fallbackUser?.name || "Üye";
   const accountLabel = company
     ? companyRoleLabels[companyRole] || (company.status === "publish" ? "Kurumsal Üye" : "Firma Onay Bekliyor")
@@ -95,9 +100,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const handleLogout = async () => {
     const refreshToken = getRefreshToken();
     try {
-      if (refreshToken) {
-        await logout({ variables: { refreshToken } });
-      }
+      if (refreshToken) await logout({ variables: { refreshToken } });
     } finally {
       clearSession();
       router.replace("/giris");
@@ -120,51 +123,36 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             <span className="font-bold text-sm">{initials(displayName)}</span>
           </div>
           <div className="min-w-0">
-            <span className="block text-sm font-bold truncate w-36">
-              {loading && !profile && !fallbackUser ? "Yükleniyor..." : displayName}
-            </span>
+            <span className="block text-sm font-bold truncate w-36">{loading && !profile && !fallbackUser ? "Yükleniyor..." : displayName}</span>
             <span className="text-[10px] text-gray-400 uppercase">{accountLabel}</span>
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
           <p className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Yönetim</p>
-          <Link href="/hesabim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <LayoutDashboard size={18} className="group-hover:text-primary" /> Özet Durum
-          </Link>
-          <Link href="/hesabim/ilanlarim" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <Briefcase size={18} className="group-hover:text-primary" /> İlanlar & Talepler
-          </Link>
-          {isOwner ? (
-            <Link href="/hesabim/teklifler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-              <FileText size={18} className="group-hover:text-primary" /> Gelen Teklifler
-            </Link>
+          <Link href="/hesabim" className={navClass}><LayoutDashboard size={18} className="group-hover:text-primary" /> Özet Durum</Link>
+          <Link href="/hesabim/ilanlarim" className={navClass}><Briefcase size={18} className="group-hover:text-primary" /> İlanlar & Talepler</Link>
+          <Link href="/hesabim/basvurularim" className={navClass}><ClipboardList size={18} className="group-hover:text-primary" /> Başvurularım</Link>
+          {canManageCompanyContent ? (
+            <Link href="/hesabim/gelen-basvurular" className={navClass}><UsersRound size={18} className="group-hover:text-primary" /> Gelen Başvurular</Link>
           ) : null}
-          <Link href="/hesabim/etkinlikler" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-            <Calendar size={18} className="group-hover:text-primary" /> Etkinlikler
-          </Link>
+          {isOwner ? (
+            <Link href="/hesabim/teklifler" className={navClass}><FileText size={18} className="group-hover:text-primary" /> Gelen Teklifler</Link>
+          ) : null}
+          <Link href="/hesabim/etkinlikler" className={navClass}><Calendar size={18} className="group-hover:text-primary" /> Etkinlikler</Link>
 
           {isOwner ? (
             <>
               <div className="my-4 border-t border-gray-800" />
               <p className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hesap</p>
-              <Link href="/hesabim/ayarlar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-                <Settings size={18} className="group-hover:text-primary" /> Firma Ayarları
-              </Link>
-              <Link href="/hesabim/kullanicilar" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white rounded-sm transition-colors group">
-                <User size={18} className="group-hover:text-primary" /> Alt Kullanıcılar
-              </Link>
+              <Link href="/hesabim/ayarlar" className={navClass}><Settings size={18} className="group-hover:text-primary" /> Firma Ayarları</Link>
+              <Link href="/hesabim/kullanicilar" className={navClass}><User size={18} className="group-hover:text-primary" /> Alt Kullanıcılar</Link>
             </>
           ) : null}
         </nav>
 
         <div className="p-4 border-t border-gray-800">
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 w-full px-4 py-2 disabled:opacity-60"
-          >
+          <button type="button" onClick={handleLogout} disabled={loggingOut} className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 w-full px-4 py-2 disabled:opacity-60">
             <LogOut size={16} /> {loggingOut ? "Çıkış yapılıyor..." : "Güvenli Çıkış"}
           </button>
         </div>
@@ -173,22 +161,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8">
           <span className="text-sm font-bold text-gray-400 lg:hidden">Panel</span>
-          <div className="hidden lg:block text-sm font-bold text-gray-500">
-            Yönetim Paneli / <span className="text-secondary">Genel Bakış</span>
-          </div>
+          <div className="hidden lg:block text-sm font-bold text-gray-500">Yönetim Paneli / <span className="text-secondary">Genel Bakış</span></div>
           <div className="flex items-center gap-4">
-            <button type="button" className="relative p-2 text-gray-400 hover:text-primary">
-              <Bell size={20} />
-            </button>
+            <button type="button" className="relative p-2 text-gray-400 hover:text-primary"><Bell size={20} /></button>
             <div className="h-8 w-px bg-gray-200" />
             {company?.slug ? (
-              <Link href={`/firma/${company.slug}`} className="text-xs font-bold uppercase text-secondary hover:text-primary flex items-center gap-2">
-                <Building2 size={16} /> Firma Profilim
-              </Link>
+              <Link href={`/firma/${company.slug}`} className="text-xs font-bold uppercase text-secondary hover:text-primary flex items-center gap-2"><Building2 size={16} /> Firma Profilim</Link>
             ) : (
-              <Link href="/firma-ekle" className="text-xs font-bold uppercase text-secondary hover:text-primary flex items-center gap-2">
-                <Building2 size={16} /> Firma Ekle
-              </Link>
+              <Link href="/firma-ekle" className="text-xs font-bold uppercase text-secondary hover:text-primary flex items-center gap-2"><Building2 size={16} /> Firma Ekle</Link>
             )}
           </div>
         </header>
