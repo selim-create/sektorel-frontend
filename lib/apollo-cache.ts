@@ -38,6 +38,13 @@ export function createApolloCache() {
           },
         },
       },
+      Location: {
+        fields: {
+          locationDetails: {
+            merge: true,
+          },
+        },
+      },
     },
   });
 }
