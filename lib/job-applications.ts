@@ -45,14 +45,24 @@ async function parseRestError(response: Response) {
   }
 }
 
+async function fetchProtectedCv(url: string, view = false) {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Oturum doğrulanamadı. Lütfen yeniden giriş yapın.");
+
+  const endpoint = view ? `${url}${url.includes("?") ? "&" : "?"}view=1` : url;
+  const response = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!response.ok) throw new Error(await parseRestError(response));
+  return response.blob();
+}
+
 export function validateCvFile(file: File) {
   const extension = file.name.split(".").pop()?.toLowerCase();
-  if (!extension || !["pdf", "docx"].includes(extension)) {
-    return "Yalnızca PDF veya DOCX dosyası yükleyebilirsiniz.";
-  }
-  if (file.size < 1 || file.size > 5 * 1024 * 1024) {
-    return "CV dosyası en fazla 5 MB olabilir.";
-  }
+  if (!extension || !["pdf", "docx"].includes(extension)) return "Yalnızca PDF veya DOCX dosyası yükleyebilirsiniz.";
+  if (file.size < 1 || file.size > 5 * 1024 * 1024) return "CV dosyası en fazla 5 MB olabilir.";
   return "";
 }
 
@@ -65,47 +75,23 @@ export async function uploadJobApplicationCv(file: File) {
 
   const body = new FormData();
   body.append("file", file, file.name);
+  const response = await fetch(CV_UPLOAD_ENDPOINT, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
+  if (!response.ok) throw new Error(await parseRestError(response));
 
-  const response = await fetch(CV_UPLOAD_ENDPOINT, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
+  const payload = (await response.json()) as { cvToken?: string; fileName?: string; fileSize?: number };
+  if (!payload.cvToken) throw new Error("CV yükleme anahtarı oluşturulamadı.");
+  return { cvToken: payload.cvToken, fileName: payload.fileName || file.name, fileSize: Number(payload.fileSize || file.size) };
+}
 
-  if (!response.ok) {
-    throw new Error(await parseRestError(response));
-  }
-
-  const payload = (await response.json()) as {
-    cvToken?: string;
-    fileName?: string;
-    fileSize?: number;
-  };
-
-  if (!payload.cvToken) {
-    throw new Error("CV yükleme anahtarı oluşturulamadı.");
-  }
-
-  return {
-    cvToken: payload.cvToken,
-    fileName: payload.fileName || file.name,
-    fileSize: Number(payload.fileSize || file.size),
-  };
+export async function openProtectedCv(url: string) {
+  const blob = await fetchProtectedCv(url, true);
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 }
 
 export async function downloadProtectedCv(url: string, fileName = "cv") {
-  const token = await getValidAccessToken();
-  if (!token) throw new Error("Oturum doğrulanamadı. Lütfen yeniden giriş yapın.");
-
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseRestError(response));
-  }
-
-  const blob = await response.blob();
+  const blob = await fetchProtectedCv(url, false);
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
@@ -120,9 +106,5 @@ export function formatJobApplicationDate(value?: string | null) {
   if (!value) return "Tarih bilgisi yok";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Tarih bilgisi yok";
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Europe/Istanbul",
-  }).format(date);
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(date);
 }
