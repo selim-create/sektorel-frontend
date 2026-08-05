@@ -1,5 +1,5 @@
-import JobApplications from "@/components/dashboard/JobApplications";
+import JobApplicationsV2 from "@/components/dashboard/JobApplicationsV2";
 
 export default function IncomingJobApplicationsPage() {
-  return <JobApplications mode="incoming" />;
+  return <JobApplicationsV2 mode="incoming" />;
 }
