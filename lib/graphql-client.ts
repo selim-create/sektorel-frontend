@@ -2,9 +2,9 @@ import { ApolloLink, HttpLink, type OperationVariables, type QueryOptions } from
 import {
   registerApolloClient,
   ApolloClient,
-  InMemoryCache,
 } from "@apollo/client-integration-nextjs";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT, logGraphQLError } from "@/lib/error-handler";
+import { createApolloCache } from "@/lib/apollo-cache";
 
 const REQUEST_TIMEOUT_MS = 5000;
 const RETRY_ATTEMPTS = 0;
@@ -23,7 +23,7 @@ async function timedFetch(input: RequestInfo | URL, init?: RequestInit) {
 
 export const { getClient } = registerApolloClient(() => {
   return new ApolloClient({
-    cache: new InMemoryCache(),
+    cache: createApolloCache(),
     defaultOptions: {
       query: {
         errorPolicy: "all",

@@ -4,12 +4,12 @@ import { ApolloLink, HttpLink, Observable } from "@apollo/client";
 import {
   ApolloNextAppProvider,
   ApolloClient,
-  InMemoryCache,
   SSRMultipartLink,
 } from "@apollo/client-integration-nextjs";
 import ErrorBoundary from "@/components/error/ErrorBoundary";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT } from "@/lib/error-handler";
 import { getValidAccessToken } from "@/lib/auth";
+import { createApolloCache } from "@/lib/apollo-cache";
 
 function makeClient() {
   const httpLink = new HttpLink({
@@ -55,7 +55,7 @@ function makeClient() {
     : ApolloLink.from([authLink, httpLink]);
 
   return new ApolloClient({
-    cache: new InMemoryCache(),
+    cache: createApolloCache(),
     defaultOptions: {
       query: { errorPolicy: "all" },
       watchQuery: { errorPolicy: "all" },
