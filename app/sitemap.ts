@@ -34,6 +34,27 @@ type LocationOptionsResponse = {
   };
 };
 
+type CompanyCombinationNode = {
+  sectors?: {
+    nodes?: Array<{ slug?: string | null } | null> | null;
+  } | null;
+  locations?: {
+    nodes?: Array<{ slug?: string | null } | null> | null;
+  } | null;
+};
+
+type CompanyCombinationResponse = {
+  data?: {
+    companies?: {
+      nodes?: Array<CompanyCombinationNode | null> | null;
+      pageInfo?: {
+        hasNextPage?: boolean | null;
+        endCursor?: string | null;
+      } | null;
+    } | null;
+  };
+};
+
 type ConnectionDefinition = {
   name: "companies" | "sectors" | "posts" | "events" | "leads" | "jobs";
   path: string;
@@ -171,15 +192,104 @@ async function fetchLocationRoutes(): Promise<MetadataRoute.Sitemap> {
   return [...cityRoutes, ...districtRoutes];
 }
 
+async function fetchCompanyCombinationNodes() {
+  const nodes: CompanyCombinationNode[] = [];
+  let after: string | null = null;
+  let page = 0;
+
+  do {
+    const query = `
+      query SitemapCompanyCombinations($first: Int!, $after: String) {
+        companies(first: $first, after: $after) {
+          nodes {
+            sectors { nodes { slug } }
+            locations { nodes { slug } }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    `;
+
+    const payload: CompanyCombinationResponse =
+      await postGraphQL<CompanyCombinationResponse>(query, {
+        first: 100,
+        after,
+      });
+    const connection = payload.data?.companies;
+
+    nodes.push(
+      ...(connection?.nodes ?? []).filter(
+        (node): node is CompanyCombinationNode => Boolean(node),
+      ),
+    );
+    after = connection?.pageInfo?.hasNextPage
+      ? connection.pageInfo.endCursor ?? null
+      : null;
+    page += 1;
+  } while (after && page < 50);
+
+  return nodes;
+}
+
+async function fetchCitySectorRoutes(): Promise<MetadataRoute.Sitemap> {
+  const cities = await fetchLocationOptions("city");
+  const citySlugs = new Set(cities.map((city) => city.slug));
+  const districtToCity = new Map<string, string>();
+
+  await Promise.all(
+    cities.map(async (city) => {
+      const districts = await fetchLocationOptions("district", city.slug);
+      districts.forEach((district) => districtToCity.set(district.slug, city.slug));
+    }),
+  );
+
+  const companies = await fetchCompanyCombinationNodes();
+  const combinations = new Set<string>();
+
+  companies.forEach((company) => {
+    const sectors = (company.sectors?.nodes ?? [])
+      .map((sector) => sector?.slug)
+      .filter((slug): slug is string => Boolean(slug));
+    const locations = (company.locations?.nodes ?? [])
+      .map((location) => location?.slug)
+      .filter((slug): slug is string => Boolean(slug));
+    const companyCities = new Set<string>();
+
+    locations.forEach((locationSlug) => {
+      if (citySlugs.has(locationSlug)) companyCities.add(locationSlug);
+      const parentCity = districtToCity.get(locationSlug);
+      if (parentCity) companyCities.add(parentCity);
+    });
+
+    companyCities.forEach((citySlug) => {
+      sectors.forEach((sectorSlug) => {
+        combinations.add(`${citySlug}/${sectorSlug}-firmalari`);
+      });
+    });
+  });
+
+  return Array.from(combinations).map((path) => ({
+    url: absoluteUrl(`/${path}`),
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }));
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [connectionResults, locationResult] = await Promise.all([
+  const [connectionResults, locationResult, citySectorResult] = await Promise.all([
     Promise.allSettled(CONNECTIONS.map(fetchConnection)),
     fetchLocationRoutes().catch(() => [] as MetadataRoute.Sitemap),
+    fetchCitySectorRoutes().catch(() => [] as MetadataRoute.Sitemap),
   ]);
 
   const dynamicRoutes = connectionResults.flatMap((result) =>
     result.status === "fulfilled" ? result.value : [],
   );
 
-  return [...STATIC_ROUTES, ...dynamicRoutes, ...locationResult];
+  return [
+    ...STATIC_ROUTES,
+    ...dynamicRoutes,
+    ...locationResult,
+    ...citySectorResult,
+  ];
 }
