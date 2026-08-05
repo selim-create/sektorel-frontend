@@ -20,6 +20,20 @@ type ConnectionResponse = {
   >;
 };
 
+type LocationOption = {
+  databaseId?: number | null;
+  name?: string | null;
+  slug?: string | null;
+  type?: string | null;
+  parentId?: number | null;
+};
+
+type LocationOptionsResponse = {
+  data?: {
+    sektorelLocationOptions?: Array<LocationOption | null> | null;
+  };
+};
+
 type ConnectionDefinition = {
   name: "companies" | "sectors" | "posts" | "events" | "leads" | "jobs";
   path: string;
@@ -50,6 +64,24 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
   { url: absoluteUrl("/iletisim"), changeFrequency: "monthly", priority: 0.5 },
 ];
 
+async function postGraphQL<TData>(
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<TData> {
+  const response = await fetch(GRAPHQL_ENDPOINT, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+    next: { revalidate: 3600 },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Sitemap request failed: ${response.status}`);
+  }
+
+  return (await response.json()) as TData;
+}
+
 async function fetchConnection(definition: ConnectionDefinition) {
   const nodes: SitemapNode[] = [];
   let after: string | null = null;
@@ -66,21 +98,10 @@ async function fetchConnection(definition: ConnectionDefinition) {
       }
     `;
 
-    const response = await fetch(GRAPHQL_ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        query,
-        variables: { first: 100, after },
-      }),
-      next: { revalidate: 3600 },
+    const payload: ConnectionResponse = await postGraphQL<ConnectionResponse>(query, {
+      first: 100,
+      after,
     });
-
-    if (!response.ok) {
-      throw new Error(`Sitemap ${definition.name} request failed: ${response.status}`);
-    }
-
-    const payload = (await response.json()) as ConnectionResponse;
     const connection = payload.data?.[definition.name];
 
     nodes.push(...(connection?.nodes ?? []));
@@ -100,11 +121,65 @@ async function fetchConnection(definition: ConnectionDefinition) {
     }));
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const results = await Promise.allSettled(CONNECTIONS.map(fetchConnection));
-  const dynamicRoutes = results.flatMap((result) =>
+async function fetchLocationOptions(type: "city" | "district", parentSlug?: string) {
+  const query = `
+    query SitemapLocationOptions($type: String!, $parentSlug: String, $first: Int!) {
+      sektorelLocationOptions(type: $type, parentSlug: $parentSlug, first: $first) {
+        databaseId
+        name
+        slug
+        type
+        parentId
+      }
+    }
+  `;
+
+  const payload: LocationOptionsResponse = await postGraphQL<LocationOptionsResponse>(query, {
+    type,
+    parentSlug: parentSlug ?? null,
+    first: 200,
+  });
+
+  return (payload.data?.sektorelLocationOptions ?? []).filter(
+    (option): option is LocationOption & { slug: string } => Boolean(option?.slug),
+  );
+}
+
+async function fetchLocationRoutes(): Promise<MetadataRoute.Sitemap> {
+  const cities = await fetchLocationOptions("city");
+  const cityRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
+    url: absoluteUrl(`/${city.slug}`),
+    changeFrequency: "weekly",
+    priority: 0.85,
+  }));
+
+  const districtResults = await Promise.allSettled(
+    cities.map(async (city) => {
+      const districts = await fetchLocationOptions("district", city.slug);
+      return districts.map((district): MetadataRoute.Sitemap[number] => ({
+        url: absoluteUrl(`/${city.slug}/${district.slug}`),
+        changeFrequency: "weekly",
+        priority: 0.75,
+      }));
+    }),
+  );
+
+  const districtRoutes = districtResults.flatMap((result) =>
     result.status === "fulfilled" ? result.value : [],
   );
 
-  return [...STATIC_ROUTES, ...dynamicRoutes];
+  return [...cityRoutes, ...districtRoutes];
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const [connectionResults, locationResult] = await Promise.all([
+    Promise.allSettled(CONNECTIONS.map(fetchConnection)),
+    fetchLocationRoutes().catch(() => [] as MetadataRoute.Sitemap),
+  ]);
+
+  const dynamicRoutes = connectionResults.flatMap((result) =>
+    result.status === "fulfilled" ? result.value : [],
+  );
+
+  return [...STATIC_ROUTES, ...dynamicRoutes, ...locationResult];
 }
