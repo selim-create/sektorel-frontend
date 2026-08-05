@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import FallbackUI from "@/components/error/FallbackUI";
 import { queryWithFallback } from "@/lib/graphql-client";
@@ -40,6 +41,27 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+
+const HOME_TITLE = "Sektörel Ajanda | Türkiye'nin İş Platformu";
+const HOME_DESCRIPTION =
+  "Türkiye genelindeki firmaları, sektörleri, haberleri, etkinlikleri, ticari fırsatları ve iş ilanlarını tek platformda keşfedin.";
+
+export const metadata: Metadata = {
+  title: { absolute: HOME_TITLE },
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
+};
 
 export const revalidate = 60;
 
