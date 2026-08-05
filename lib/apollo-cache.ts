@@ -1,4 +1,4 @@
-import { InMemoryCache } from "@apollo/client";
+import { InMemoryCache } from "@apollo/client-integration-nextjs";
 
 export function createApolloCache() {
   return new InMemoryCache({
