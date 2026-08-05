@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
+import { SectorCityLinks } from "@/components/location/DirectoryFacetLinks";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import JsonLd from "@/components/seo/JsonLd";
 import { queryWithFallback } from "@/lib/graphql-client";
@@ -172,6 +173,7 @@ export default async function SectorLayout({
         ]}
       />
       {children}
+      <SectorCityLinks sectorSlug={sector.slug} />
     </>
   );
 }
