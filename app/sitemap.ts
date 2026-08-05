@@ -64,7 +64,10 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
   { url: absoluteUrl("/iletisim"), changeFrequency: "monthly", priority: 0.5 },
 ];
 
-async function postGraphQL<TData>(query: string, variables: Record<string, unknown>) {
+async function postGraphQL<TData>(
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<TData> {
   const response = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -95,7 +98,7 @@ async function fetchConnection(definition: ConnectionDefinition) {
       }
     `;
 
-    const payload = await postGraphQL<ConnectionResponse>(query, {
+    const payload: ConnectionResponse = await postGraphQL<ConnectionResponse>(query, {
       first: 100,
       after,
     });
@@ -131,7 +134,7 @@ async function fetchLocationOptions(type: "city" | "district", parentSlug?: stri
     }
   `;
 
-  const payload = await postGraphQL<LocationOptionsResponse>(query, {
+  const payload: LocationOptionsResponse = await postGraphQL<LocationOptionsResponse>(query, {
     type,
     parentSlug: parentSlug ?? null,
     first: 200,
