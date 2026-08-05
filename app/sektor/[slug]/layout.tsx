@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
 import { SectorCityLinks } from "@/components/location/DirectoryFacetLinks";
-import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import JsonLd from "@/components/seo/JsonLd";
 import { queryWithFallback } from "@/lib/graphql-client";
 import {
@@ -165,13 +164,6 @@ export default async function SectorLayout({
   return (
     <>
       <JsonLd data={[collectionSchema, breadcrumbSchema]} />
-      <Breadcrumbs
-        items={[
-          { label: "Ana Sayfa", href: "/" },
-          { label: "Sektörler", href: "/sektorler" },
-          { label: sector.name },
-        ]}
-      />
       {children}
       <SectorCityLinks sectorSlug={sector.slug} />
     </>
