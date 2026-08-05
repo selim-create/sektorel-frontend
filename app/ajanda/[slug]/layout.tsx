@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
-import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata, isValidDate, parseNumericPrice } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
@@ -144,9 +143,6 @@ export default async function EventLayout({ children, params }: { children: Reac
   return (
     <>
       <JsonLd data={[eventSchema, createBreadcrumbSchema(breadcrumbItems)]} />
-      <Breadcrumbs
-        items={breadcrumbItems.map((item, index) => ({ label: item.name, href: index === breadcrumbItems.length - 1 ? undefined : item.path }))}
-      />
       {children}
     </>
   );

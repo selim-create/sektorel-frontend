@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
-import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata, isValidDate } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
-import { absoluteUrl, compactObject, stripHtml, truncateText } from "@/lib/site";
+import { absoluteUrl, compactObject, stripHtml } from "@/lib/site";
 
 const JOB_SEO_QUERY = gql`
   query JobSeo($slug: ID!) {
@@ -124,9 +123,6 @@ export default async function JobLayout({ children, params }: { children: React.
   return (
     <>
       <JsonLd data={[jobSchema, createBreadcrumbSchema(breadcrumbItems)]} />
-      <Breadcrumbs
-        items={breadcrumbItems.map((item, index) => ({ label: item.name, href: index === breadcrumbItems.length - 1 ? undefined : item.path }))}
-      />
       {children}
     </>
   );
