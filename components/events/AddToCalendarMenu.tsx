@@ -1,0 +1,59 @@
+import { Calendar, ChevronDown, Download } from "lucide-react";
+import {
+  buildGoogleCalendarUrl,
+  buildIcsDataUrl,
+  buildOutlookCalendarUrl,
+  type CalendarEventInput,
+} from "@/lib/event-calendar";
+
+type AddToCalendarMenuProps = CalendarEventInput & {
+  fileName?: string;
+};
+
+export default function AddToCalendarMenu({
+  fileName = "sektorel-ajanda-etkinlik.ics",
+  ...event
+}: AddToCalendarMenuProps) {
+  const googleUrl = buildGoogleCalendarUrl(event);
+  const outlookUrl = buildOutlookCalendarUrl(event);
+  const icsUrl = buildIcsDataUrl(event);
+
+  return (
+    <details className="group relative">
+      <summary className="flex w-full cursor-pointer list-none items-center justify-center gap-2 border border-gray-300 bg-white py-3 text-xs font-bold uppercase tracking-wider text-secondary transition-colors hover:bg-gray-50 [&::-webkit-details-marker]:hidden">
+        <Calendar size={14} />
+        Takvime Ekle
+        <ChevronDown className="transition-transform group-open:rotate-180" size={14} />
+      </summary>
+
+      <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden border border-gray-200 bg-white shadow-xl">
+        <a
+          className="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
+          href={googleUrl}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Google Calendar
+          <Calendar size={15} />
+        </a>
+        <a
+          className="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
+          href={outlookUrl}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Outlook Takvimi
+          <Calendar size={15} />
+        </a>
+        <a
+          className="flex items-center justify-between px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
+          download={fileName}
+          href={icsUrl}
+        >
+          Apple / Diğer (.ics)
+          <Download size={15} />
+        </a>
+      </div>
+    </details>
+  );
+}
