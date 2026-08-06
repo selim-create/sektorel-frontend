@@ -3,6 +3,22 @@ import { InMemoryCache } from "@apollo/client-integration-nextjs";
 export function createApolloCache() {
   return new InMemoryCache({
     typePolicies: {
+      Query: {
+        fields: {
+          sektorelSession: {
+            merge: false,
+          },
+          sektorelOwnedContent: {
+            merge: false,
+          },
+          sektorelMyJobApplications: {
+            merge: false,
+          },
+          sektorelIncomingJobApplicationsV2: {
+            merge: false,
+          },
+        },
+      },
       Event: {
         fields: {
           eventDetails: {
