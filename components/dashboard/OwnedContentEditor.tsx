@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { gql } from "@apollo/client";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -38,6 +38,26 @@ const emptyForm = {
 
 type FormState = typeof emptyForm;
 
+type OwnedContentRecord = Partial<FormState> & {
+  databaseId: number;
+  type: "lead" | "career" | "event";
+  status?: string;
+  slug?: string;
+};
+
+function formFromContent(content: OwnedContentRecord): FormState {
+  return {
+    ...emptyForm,
+    ...Object.fromEntries(
+      Object.keys(emptyForm).map((key) => [
+        key,
+        content[key as keyof FormState] ?? emptyForm[key as keyof FormState],
+      ]),
+    ),
+    isHiddenName: Boolean(content.isHiddenName),
+  } as FormState;
+}
+
 export default function OwnedContentEditor({ databaseId }: { databaseId: number }) {
   const { data, loading, error } = useQuery(CONTENT_DETAIL_QUERY, {
     variables: { databaseId },
@@ -46,29 +66,31 @@ export default function OwnedContentEditor({ databaseId }: { databaseId: number 
   });
   const sectorsQuery = useQuery(GET_ALL_SECTORS, { errorPolicy: "all" });
   const [updateContent, { loading: saving }] = useMutation(UPDATE_CONTENT_MUTATION, { errorPolicy: "all" });
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [ready, setReady] = useState(false);
+  const [drafts, setDrafts] = useState<Record<number, FormState>>({});
   const [message, setMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
-  const content = data?.sektorelOwnedContentDetail;
+  const content = data?.sektorelOwnedContentDetail as OwnedContentRecord | undefined;
 
-  useEffect(() => {
-    if (!content || ready) return;
-    setForm({
-      ...emptyForm,
-      ...Object.fromEntries(Object.keys(emptyForm).map((key) => [key, content[key] ?? emptyForm[key as keyof FormState]])),
-      isHiddenName: Boolean(content.isHiddenName),
-    } as FormState);
-    setReady(true);
-  }, [content, ready]);
+  const form = content
+    ? drafts[content.databaseId] ?? formFromContent(content)
+    : emptyForm;
 
   const setValue = (key: keyof FormState, value: string | boolean) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    if (!content) return;
+    setDrafts((current) => ({
+      ...current,
+      [content.databaseId]: {
+        ...(current[content.databaseId] ?? formFromContent(content)),
+        [key]: value,
+      },
+    }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!content) return;
+
     setMessage("");
     setSaveError("");
 
