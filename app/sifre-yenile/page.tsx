@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
@@ -23,23 +23,19 @@ const RESET_PASSWORD = gql`
 `;
 
 export default function ResetPasswordPage() {
-  const [login, setLogin] = useState("");
-  const [key, setKey] = useState("");
   const [password, setPassword] = useState("");
   const [passwordAgain, setPasswordAgain] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [resetPassword, { loading }] = useMutation(RESET_PASSWORD);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setLogin(params.get("login") || "");
-    setKey(params.get("key") || "");
-  }, []);
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
+
+    const params = new URLSearchParams(window.location.search);
+    const login = params.get("login") || "";
+    const key = params.get("key") || "";
 
     if (!login || !key) {
       setError("Parola sıfırlama bağlantısı eksik veya geçersiz.");
