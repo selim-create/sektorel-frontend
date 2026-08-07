@@ -19,14 +19,14 @@ export default function AddToCalendarMenu({
   const icsUrl = buildIcsDataUrl(event);
 
   return (
-    <details className="group relative">
+    <details className="group relative z-[100]">
       <summary className="flex w-full cursor-pointer list-none items-center justify-center gap-2 border border-gray-300 bg-white py-3 text-xs font-bold uppercase tracking-wider text-secondary transition-colors hover:bg-gray-50 [&::-webkit-details-marker]:hidden">
         <Calendar size={14} />
         Takvime Ekle
         <ChevronDown className="transition-transform group-open:rotate-180" size={14} />
       </summary>
 
-      <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden border border-gray-200 bg-white shadow-xl">
+      <div className="absolute inset-x-0 top-full z-[110] mt-2 overflow-hidden border border-gray-200 bg-white shadow-2xl">
         <a
           className="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
           href={googleUrl}
