@@ -37,8 +37,9 @@ import {
   slugify,
   stripHtml,
 } from "@/lib/agenda";
+import { GET_AGENDA_EVENTS_PAGINATED } from "@/lib/agenda-queries";
 import { queryWithFallback } from "@/lib/graphql-client";
-import { GET_ALL_SECTORS, GET_EVENTS_PAGINATED } from "@/lib/queries";
+import { GET_ALL_SECTORS } from "@/lib/queries";
 
 export const revalidate = 60;
 
@@ -60,6 +61,8 @@ const SECTORS_FALLBACK = {
 
 type SearchParams = Promise<{
   view?: string | string[];
+  scope?: string | string[];
+  officialCategory?: string | string[];
   month?: string | string[];
   type?: string | string[];
   sector?: string | string[];
@@ -90,6 +93,9 @@ type EventNode = {
     price?: string | null;
     organizer?: string | null;
     registrationLink?: string | null;
+    officialCategory?: string | null;
+    officialInstitution?: string | null;
+    officialSourceUrl?: string | null;
   } | null;
   featuredImage?: {
     node?: {
@@ -159,6 +165,8 @@ function normalizeEvent(node: EventNode, sectors: AgendaTaxonomy[]): AgendaEvent
     details.organizer,
     details.venue,
     details.address,
+    details.officialCategory,
+    details.officialInstitution,
   ]
     .filter(Boolean)
     .join(" ")
@@ -194,6 +202,9 @@ function normalizeEvent(node: EventNode, sectors: AgendaTaxonomy[]): AgendaEvent
       price: details.price?.trim() || null,
       organizer: details.organizer?.trim() || null,
       registrationLink: details.registrationLink?.trim() || null,
+      officialCategory: details.officialCategory?.trim() || null,
+      officialInstitution: details.officialInstitution?.trim() || null,
+      officialSourceUrl: details.officialSourceUrl?.trim() || null,
     },
   };
 }
@@ -234,7 +245,7 @@ async function fetchAllEvents() {
       { first: number; after: string | null }
     >(
       {
-        query: GET_EVENTS_PAGINATED,
+        query: GET_AGENDA_EVENTS_PAGINATED,
         variables: { first: 100, after },
       },
       EVENTS_FALLBACK,
@@ -262,6 +273,14 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
   const params = await searchParams;
   const monthValue = getValidMonth(getSingleValue(params.month) || formatMonthValue(new Date()));
   const monthLabel = format(getMonthDate(monthValue), "LLLL yyyy", { locale: tr });
+  const scope = getSingleValue(params.scope);
+
+  if (scope === "official") {
+    return {
+      title: `Resmî ve Mali Takvim | ${monthLabel} | Sektörel Ajanda`,
+      description: "Vergi, SGK, beyanname, teşvik ve resmî yükümlülük tarihlerini Sektörel Ajanda üzerinden takip edin.",
+    };
+  }
 
   return {
     title: `Etkinlik Ajandası | ${monthLabel} | Sektörel Ajanda`,
@@ -274,6 +293,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const resolvedSearchParams = await searchParams;
   const viewParam = getSingleValue(resolvedSearchParams.view);
   const view = viewParam === "list" ? "list" : "calendar";
+  const scopeParam = getSingleValue(resolvedSearchParams.scope);
+  const scope = scopeParam === "official" || scopeParam === "events" ? scopeParam : "all";
+  const officialCategory = getSingleValue(resolvedSearchParams.officialCategory);
   const monthValue = getValidMonth(getSingleValue(resolvedSearchParams.month) || formatMonthValue(new Date()));
   const type = getSingleValue(resolvedSearchParams.type);
   const sector = getSingleValue(resolvedSearchParams.sector);
@@ -322,7 +344,19 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     const startDate = parseEventDate(event.eventDetails.startDate);
     if (!startDate) return false;
 
-    if (type && event.eventDetails.eventType !== type) {
+    if (scope === "official" && !event.eventDetails.isOfficial) {
+      return false;
+    }
+
+    if (scope === "events" && event.eventDetails.isOfficial) {
+      return false;
+    }
+
+    if (scope === "official" && officialCategory && event.eventDetails.officialCategory !== officialCategory) {
+      return false;
+    }
+
+    if (type && scope !== "official" && event.eventDetails.eventType !== type) {
       return false;
     }
 
@@ -350,9 +384,11 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       return false;
     }
 
-    const parsedPrice = parsePriceValue(event.eventDetails.price);
-    if (parsedPrice !== null && parsedPrice > maxPriceValue) {
-      return false;
+    if (scope !== "official") {
+      const parsedPrice = parsePriceValue(event.eventDetails.price);
+      if (parsedPrice !== null && parsedPrice > maxPriceValue) {
+        return false;
+      }
     }
 
     return true;
@@ -406,9 +442,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const safePage = Math.min(currentPage, totalPages);
   const paginatedList = listSource.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const eventTypes = Array.from(new Set(normalizedEvents.map((event) => event.eventDetails.eventType))).sort((left, right) =>
-    left.localeCompare(right, "tr"),
-  );
+  const eventTypes = Array.from(
+    new Set(normalizedEvents.filter((event) => !event.eventDetails.isOfficial).map((event) => event.eventDetails.eventType)),
+  ).sort((left, right) => left.localeCompare(right, "tr"));
   const matchedSectors = Array.from(
     new Map(filteredEvents.flatMap((event) => event.sectorLabels).map((item) => [item.slug, item])).values(),
   ).sort((left, right) => left.name.localeCompare(right.name, "tr"));
@@ -417,14 +453,16 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   );
 
   const baseParams = {
+    ...(scope !== "all" ? { scope } : {}),
+    ...(scope === "official" && officialCategory ? { officialCategory } : {}),
     ...(q ? { q } : {}),
-    ...(type ? { type } : {}),
+    ...(type && scope !== "official" ? { type } : {}),
     ...(sector ? { sector } : {}),
     ...(location ? { location } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     ...(sort !== "date-asc" ? { sort } : {}),
-    ...(priceMax !== "50000" ? { priceMax } : {}),
+    ...(priceMax !== "50000" && scope !== "official" ? { priceMax } : {}),
     ...(view === "list" ? { view } : {}),
     month: monthValue,
     ...(selectedDate ? { date: selectedDate } : {}),
@@ -433,6 +471,16 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const selectedDayLabel = selectedDate
     ? format(parseISO(selectedDate), "d MMMM yyyy, EEEE", { locale: tr })
     : null;
+
+  const listTitle = selectedDayLabel
+    ? `${selectedDayLabel} Kayıtları`
+    : scope === "official"
+      ? "Yaklaşan resmî ve mali tarihler"
+      : scope === "events"
+        ? "Yaklaşan etkinlikler"
+        : view === "list"
+          ? "Tüm yaklaşan ajanda kayıtları"
+          : "Yaklaşan ajanda kayıtları";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
@@ -450,11 +498,11 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.3em] text-gray-300">
                 <Calendar size={12} className="text-primary" />
-                Sektörel Etkinlik Takvimi
+                Sektörel İş ve Resmî Takvim
               </div>
               <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">İş Ajandası</h1>
               <p className="mt-4 max-w-2xl text-lg leading-8 text-gray-300">
-                Konferanslardan workshop’lara, resmi takvimden networking buluşmalarına kadar tüm sektörel etkinlikleri tek sayfada izleyin.
+                Konferanslardan workshop’lara; vergi, SGK, beyanname ve teşvik tarihlerinden networking buluşmalarına kadar iş dünyasının kritik tarihlerini tek yerde izleyin.
               </p>
             </div>
 
@@ -478,7 +526,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               <p className="mt-3 text-3xl font-black">{calendarEvents.length}</p>
             </div>
             <div className="border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Resmi Takvim</p>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Resmî Takvim</p>
               <p className="mt-3 text-3xl font-black">{normalizedEvents.filter((event) => event.eventDetails.isOfficial).length}</p>
             </div>
             <div className="border border-white/10 bg-white/5 p-5">
@@ -501,26 +549,26 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-gray-400">
-                  <Sparkles size={14} className="text-primary" /> Öne Çıkan Etkinlikler
+                  <Sparkles size={14} className="text-primary" /> Öne Çıkan Ajanda Kayıtları
                 </p>
-                <h2 className="mt-2 text-2xl font-black text-secondary">Gündemdeki buluşmalar</h2>
+                <h2 className="mt-2 text-2xl font-black text-secondary">Gündemdeki kritik tarihler</h2>
               </div>
               <p className="max-w-xl text-sm leading-7 text-gray-500">
-                İlk bakışta kaçırmamanız gereken önemli etkinlikler ve resmi duyurular.
+                İlk bakışta kaçırmamanız gereken önemli etkinlikler ve resmî duyurular.
               </p>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-4 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               {featuredEvents.map((event) => (
                 <article key={event.id} className="border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] text-primary">
-                    <Star size={13} /> {event.eventDetails.eventType}
+                  <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] ${event.eventDetails.isOfficial ? "text-red-600" : "text-primary"}`}>
+                    <Star size={13} /> {event.eventDetails.isOfficial ? event.eventDetails.officialInstitution || "Resmî Takvim" : event.eventDetails.eventType}
                   </div>
                   <h3 className="mt-4 line-clamp-2 text-xl font-black text-secondary">{event.title}</h3>
                   <p className="mt-3 line-clamp-3 text-sm leading-7 text-gray-500">{event.excerpt}</p>
                   <div className="mt-5 space-y-2 text-sm text-gray-500">
                     <p className="flex items-center gap-2"><CalendarRange size={15} className="text-primary" /> {format(parseEventDate(event.eventDetails.startDate)!, "d MMMM yyyy", { locale: tr })}</p>
-                    <p className="flex items-center gap-2"><MapPin size={15} className="text-primary" /> {event.eventDetails.venue || event.city || "Online"}</p>
+                    <p className="flex items-center gap-2"><MapPin size={15} className="text-primary" /> {event.eventDetails.isOfficial ? event.eventDetails.officialInstitution || "Türkiye" : event.eventDetails.venue || event.city || "Online"}</p>
                   </div>
                   <Link href={`/ajanda/${event.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-secondary transition hover:text-primary">
                     İncele <ChevronRight size={14} />
@@ -536,6 +584,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
             <EventFilters
               currentFilters={{
                 view,
+                scope,
+                officialCategory,
                 q,
                 type,
                 sector,
@@ -556,7 +606,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
 
             <section className="space-y-4 border border-gray-200 bg-white p-5 shadow-sm">
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-gray-400">
-                <BellRing size={14} /> Arşiv / Son Etkinlikler
+                <BellRing size={14} /> Arşiv / Son Kayıtlar
               </p>
               <div className="space-y-4">
                 {archiveEvents.slice(0, 5).map((event) => (
@@ -568,7 +618,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
                   </Link>
                 ))}
                 {archiveEvents.length === 0 ? (
-                  <p className="text-sm leading-7 text-gray-500">Henüz arşivde gösterilecek tamamlanmış etkinlik bulunmuyor.</p>
+                  <p className="text-sm leading-7 text-gray-500">Henüz arşivde gösterilecek tamamlanmış kayıt bulunmuyor.</p>
                 ) : null}
               </div>
             </section>
@@ -589,13 +639,15 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               currentPage={safePage}
               totalPages={totalPages}
               baseParams={baseParams}
-              title={selectedDayLabel ? `${selectedDayLabel} Etkinlikleri` : view === "list" ? "Tüm yaklaşan etkinlikler" : "Yaklaşan etkinlikler"}
+              title={listTitle}
               description={
                 selectedDayLabel
-                  ? "Takvimde seçtiğiniz güne ait etkinlikler aşağıda listelenir."
-                  : view === "list"
-                  ? "Filtrelediğiniz ajanda kayıtlarını tarih, tip veya önem derecesine göre sıralanmış şekilde keşfedin."
-                  : "Takvim üzerinde işaretli günler arasından seçim yapabilir veya yaklaşan etkinlikleri aşağıdan inceleyebilirsiniz."
+                  ? "Takvimde seçtiğiniz güne ait ajanda kayıtları aşağıda listelenir."
+                  : scope === "official"
+                    ? "Vergi, SGK, beyanname, teşvik ve diğer resmî yükümlülük tarihlerini yaklaşan tarihe göre takip edin."
+                    : scope === "events"
+                      ? "Fuar, webinar, konferans, eğitim ve diğer sektörel etkinlikleri yaklaşan tarihe göre keşfedin."
+                      : "Takvim üzerinde işaretli günler arasından seçim yapabilir veya yaklaşan ajanda kayıtlarını aşağıdan inceleyebilirsiniz."
               }
             />
           </div>

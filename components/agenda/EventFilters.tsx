@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Filter, LayoutGrid, List, RotateCcw, Search } from "lucide-react";
-import type { AgendaTaxonomy } from "@/lib/agenda";
+import { CalendarDays, Filter, Landmark, LayoutGrid, List, RotateCcw, Search } from "lucide-react";
+import { OFFICIAL_CALENDAR_CATEGORIES, type AgendaTaxonomy } from "@/lib/agenda";
 
 type CurrentAgendaFilters = {
   view: string;
+  scope: string;
+  officialCategory: string;
   q: string;
   type: string;
   sector: string;
@@ -41,6 +43,8 @@ export default function EventFilters({
   const router = useRouter();
   const pathname = usePathname();
   const [view, setView] = useState(currentFilters.view);
+  const [scope, setScope] = useState(currentFilters.scope || "all");
+  const [officialCategory, setOfficialCategory] = useState(currentFilters.officialCategory);
   const [query, setQuery] = useState(currentFilters.q);
   const [type, setType] = useState(currentFilters.type);
   const [sector, setSector] = useState(currentFilters.sector);
@@ -65,14 +69,18 @@ export default function EventFilters({
   }, [currentFilters.view, hasViewParam, pathname, router]);
 
   const activeCount = useMemo(() => {
-    return [query, type, sector, location, from, to].filter(Boolean).length + (priceMax !== "50000" ? 1 : 0);
-  }, [from, location, priceMax, query, sector, to, type]);
+    return [query, type, sector, location, from, to, officialCategory].filter(Boolean).length +
+      (scope !== "all" ? 1 : 0) +
+      (priceMax !== "50000" ? 1 : 0);
+  }, [from, location, officialCategory, priceMax, query, scope, sector, to, type]);
 
-  const submitFilters = (nextView = view) => {
+  const submitFilters = (nextView = view, nextScope = scope, nextOfficialCategory = officialCategory) => {
     const params = new URLSearchParams();
 
+    if (nextScope && nextScope !== "all") params.set("scope", nextScope);
+    if (nextScope === "official" && nextOfficialCategory) params.set("officialCategory", nextOfficialCategory);
     if (query.trim()) params.set("q", query.trim());
-    if (type) params.set("type", type);
+    if (type && nextScope !== "official") params.set("type", type);
     if (sector) params.set("sector", sector);
     if (location) params.set("location", location);
     if (from) params.set("from", from);
@@ -87,6 +95,8 @@ export default function EventFilters({
   };
 
   const handleReset = () => {
+    setScope("all");
+    setOfficialCategory("");
     setQuery("");
     setType("");
     setSector("");
@@ -108,6 +118,14 @@ export default function EventFilters({
     submitFilters(nextView);
   };
 
+  const setNextScope = (nextScope: string) => {
+    setScope(nextScope);
+    const nextCategory = nextScope === "official" ? officialCategory : "";
+    setOfficialCategory(nextCategory);
+    if (nextScope === "official") setType("");
+    submitFilters(view, nextScope, nextCategory);
+  };
+
   return (
     <aside className="space-y-5">
       <div className="border border-gray-200 bg-white p-5 shadow-sm">
@@ -116,7 +134,7 @@ export default function EventFilters({
             <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-gray-400">
               <Filter size={14} /> Filtreler
             </p>
-            <p className="mt-3 text-sm leading-6 text-gray-500">{resultCount} etkinlik görüntüleniyor.</p>
+            <p className="mt-3 text-sm leading-6 text-gray-500">{resultCount} ajanda kaydı görüntüleniyor.</p>
           </div>
           {activeCount > 0 ? (
             <button
@@ -128,6 +146,64 @@ export default function EventFilters({
             </button>
           ) : null}
         </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => setNextScope("all")}
+            className={`border px-2 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+              scope === "all"
+                ? "border-secondary bg-secondary text-white"
+                : "border-gray-200 text-secondary hover:border-secondary"
+            }`}
+          >
+            Tümü
+          </button>
+          <button
+            type="button"
+            onClick={() => setNextScope("events")}
+            className={`inline-flex items-center justify-center gap-1.5 border px-2 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+              scope === "events"
+                ? "border-primary bg-primary text-white"
+                : "border-gray-200 text-secondary hover:border-primary hover:text-primary"
+            }`}
+          >
+            <CalendarDays size={13} /> Etkinlikler
+          </button>
+          <button
+            type="button"
+            onClick={() => setNextScope("official")}
+            className={`inline-flex items-center justify-center gap-1.5 border px-2 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+              scope === "official"
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-gray-200 text-secondary hover:border-red-500 hover:text-red-600"
+            }`}
+          >
+            <Landmark size={13} /> Resmî
+          </button>
+        </div>
+
+        {scope === "official" ? (
+          <label className="mt-4 block space-y-2">
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Resmî Takvim Kategorisi</span>
+            <select
+              value={officialCategory}
+              onChange={(event) => {
+                const nextCategory = event.target.value;
+                setOfficialCategory(nextCategory);
+                submitFilters(view, "official", nextCategory);
+              }}
+              className="w-full border border-red-200 bg-red-50 px-4 py-3 text-sm text-secondary outline-none"
+            >
+              <option value="">Tüm resmî kayıtlar</option>
+              {OFFICIAL_CALENDAR_CATEGORIES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
@@ -162,12 +238,12 @@ export default function EventFilters({
           }}
         >
           <label className="block space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Etkinlik Ara</span>
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Ajandada Ara</span>
             <div className="flex border border-gray-200 bg-gray-50">
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Başlık, organizatör, mekan"
+                placeholder="Başlık, kurum, organizatör, mekan"
                 className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-secondary outline-none placeholder:text-gray-400"
               />
               <button type="submit" className="px-4 text-gray-500 transition hover:text-primary" aria-label="Ara">
@@ -176,17 +252,19 @@ export default function EventFilters({
             </div>
           </label>
 
-          <label className="block space-y-2">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Etkinlik Tipi</span>
-            <select value={type} onChange={(event) => setType(event.target.value)} className="w-full border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-secondary outline-none">
-              <option value="">Tümü</option>
-              {eventTypes.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
+          {scope !== "official" ? (
+            <label className="block space-y-2">
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Etkinlik Tipi</span>
+              <select value={type} onChange={(event) => setType(event.target.value)} className="w-full border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-secondary outline-none">
+                <option value="">Tümü</option>
+                {eventTypes.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Sektör</span>
@@ -223,28 +301,30 @@ export default function EventFilters({
             </label>
           </div>
 
-          <label className="block space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Maksimum Ücret</span>
-              <span className="text-xs font-bold text-primary">₺{Number(priceMax).toLocaleString("tr-TR")}</span>
-            </div>
-            <input
-              value={priceMax}
-              onChange={(event) => setPriceMax(event.target.value)}
-              type="range"
-              min="0"
-              max="50000"
-              step="500"
-              className="w-full accent-[rgb(var(--primary))]"
-            />
-          </label>
+          {scope !== "official" ? (
+            <label className="block space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Maksimum Ücret</span>
+                <span className="text-xs font-bold text-primary">₺{Number(priceMax).toLocaleString("tr-TR")}</span>
+              </div>
+              <input
+                value={priceMax}
+                onChange={(event) => setPriceMax(event.target.value)}
+                type="range"
+                min="0"
+                max="50000"
+                step="500"
+                className="w-full accent-[rgb(var(--primary))]"
+              />
+            </label>
+          ) : null}
 
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Sıralama</span>
             <select value={sort} onChange={(event) => setSort(event.target.value)} className="w-full border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-secondary outline-none">
               <option value="date-asc">Tarih (Yaklaşan)</option>
               <option value="date-desc">Tarih (Uzak)</option>
-              <option value="type">Etkinlik tipi</option>
+              <option value="type">Kayıt tipi</option>
               <option value="popularity">Öne çıkanlar</option>
             </select>
           </label>
