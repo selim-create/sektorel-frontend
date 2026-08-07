@@ -360,14 +360,21 @@ export default async function EventDetailPage({
 
             {details.locationType === "physical" && mapUrl ? (
               <a
-                className="group relative z-10 flex h-48 items-center justify-center overflow-hidden border border-gray-300 bg-gray-200 transition-colors hover:border-primary hover:bg-gray-100"
+                className="group relative z-10 flex items-center justify-between border border-gray-200 bg-white px-5 py-4 shadow-sm transition-all hover:border-primary hover:shadow-md"
                 href={mapUrl}
                 rel="noopener noreferrer"
                 target="_blank"
               >
-                <span className="flex items-center gap-2 text-xs font-bold uppercase text-gray-500 transition-colors group-hover:text-primary">
-                  <MapPin size={16} /> Haritada Göster
+                <span className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                    <MapPin size={17} />
+                  </span>
+                  <span>
+                    <span className="block text-xs font-black uppercase tracking-wider text-secondary">Google Maps’te Aç</span>
+                    <span className="mt-0.5 block text-xs text-gray-500">{details.venue || details.address}</span>
+                  </span>
                 </span>
+                <span className="text-xs font-bold uppercase text-gray-400 transition-colors group-hover:text-primary">Harita →</span>
               </a>
             ) : null}
           </aside>
