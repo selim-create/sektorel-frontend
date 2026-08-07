@@ -163,6 +163,10 @@ export default async function EventDetailPage({
   const location = [details.venue, details.address].filter(Boolean).join(", ") ||
     (details.locationType === "online" ? "Online" : "Konum belirtilmedi");
   const calendarFileName = `${event.slug || slug}.ics`;
+  const mapQuery = [details.venue, details.address].filter(Boolean).join(", ");
+  const mapUrl = mapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
@@ -268,8 +272,8 @@ export default async function EventDetailPage({
             ) : null}
           </main>
 
-          <aside className="w-full space-y-6 lg:w-1/3">
-            <div className={`sticky top-24 border bg-white p-6 shadow-sm ${details.isOfficial ? "border-red-200 border-t-4 border-t-red-500" : "border-gray-200 border-t-4 border-t-primary"}`}>
+          <aside className="relative z-20 w-full space-y-6 overflow-visible lg:w-1/3">
+            <div className={`sticky top-24 z-50 overflow-visible border bg-white p-6 shadow-sm ${details.isOfficial ? "border-red-200 border-t-4 border-t-red-500" : "border-gray-200 border-t-4 border-t-primary"}`}>
               <h3 className="mb-6 flex items-center justify-between border-b border-gray-100 pb-2 text-sm font-black uppercase tracking-widest text-secondary">
                 Etkinlik Detayları
                 {details.isOfficial ? <AlertCircle className="text-red-500" size={18} /> : null}
@@ -340,7 +344,7 @@ export default async function EventDetailPage({
             </div>
 
             {!details.isOfficial && details.organizer ? (
-              <div className="border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="relative z-10 border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 className="mb-4 text-xs font-black uppercase tracking-widest text-gray-400">Organizatör</h3>
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-gray-100 font-bold text-gray-400">
@@ -354,14 +358,17 @@ export default async function EventDetailPage({
               </div>
             ) : null}
 
-            {details.locationType === "physical" ? (
-              <div className="group relative h-48 cursor-pointer overflow-hidden border border-gray-300 bg-gray-200">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="flex items-center gap-2 text-xs font-bold uppercase text-gray-500">
-                    <MapPin size={16} /> Haritada Göster
-                  </span>
-                </div>
-              </div>
+            {details.locationType === "physical" && mapUrl ? (
+              <a
+                className="group relative z-10 flex h-48 items-center justify-center overflow-hidden border border-gray-300 bg-gray-200 transition-colors hover:border-primary hover:bg-gray-100"
+                href={mapUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <span className="flex items-center gap-2 text-xs font-bold uppercase text-gray-500 transition-colors group-hover:text-primary">
+                  <MapPin size={16} /> Haritada Göster
+                </span>
+              </a>
             ) : null}
           </aside>
         </div>
