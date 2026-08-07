@@ -28,8 +28,20 @@ export type AgendaEvent = {
     price: string | null;
     organizer: string | null;
     registrationLink: string | null;
+    officialCategory: string | null;
+    officialInstitution: string | null;
+    officialSourceUrl: string | null;
   };
 };
+
+export const OFFICIAL_CALENDAR_CATEGORIES = [
+  { value: "vergi", label: "Vergi" },
+  { value: "sgk", label: "SGK" },
+  { value: "beyanname", label: "Beyanname" },
+  { value: "tesvik_destek", label: "Teşvik / Destek" },
+  { value: "son_basvuru", label: "Son Başvuru" },
+  { value: "resmi_yukumluluk", label: "Resmî Yükümlülük" },
+] as const;
 
 const TURKISH_CITIES = [
   "Adana",
@@ -250,6 +262,8 @@ export function getSearchableEventText(event: AgendaEvent) {
     event.eventDetails.organizer,
     event.eventDetails.venue,
     event.eventDetails.address,
+    event.eventDetails.officialInstitution,
+    event.eventDetails.officialCategory,
     event.city,
     ...event.sectorLabels.map((item) => item.name),
   ]
