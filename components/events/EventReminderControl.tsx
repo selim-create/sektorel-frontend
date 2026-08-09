@@ -99,7 +99,6 @@ type CancelReminderVariables = {
 
 type EventReminderControlProps = {
   eventSlug: string;
-  startDate: string;
 };
 
 function formatReminderDate(value?: string | null) {
@@ -116,18 +115,13 @@ function formatReminderDate(value?: string | null) {
   });
 }
 
-export default function EventReminderControl({ eventSlug, startDate }: EventReminderControlProps) {
+export default function EventReminderControl({ eventSlug }: EventReminderControlProps) {
   const pathname = usePathname();
   const [authState, setAuthState] = useState<"checking" | "guest" | "authenticated">("checking");
-  const [daysBefore, setDaysBefore] = useState(1);
-  const [currentReminder, setCurrentReminder] = useState<Reminder | null>(null);
+  const [selectedDaysBefore, setSelectedDaysBefore] = useState<number | null>(null);
+  const [manualReminder, setManualReminder] = useState<Reminder | null | undefined>(undefined);
   const [message, setMessage] = useState("");
   const [actionError, setActionError] = useState("");
-  const [currentTime, setCurrentTime] = useState<number | null>(null);
-
-  useEffect(() => {
-    setCurrentTime(Date.now());
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -167,22 +161,9 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
     { errorPolicy: "all" },
   );
 
-  useEffect(() => {
-    const reminder = data?.sektorelEventReminder ?? null;
-    setCurrentReminder(reminder);
-    if (reminder?.daysBefore) {
-      setDaysBefore(reminder.daysBefore);
-    }
-  }, [data]);
-
-  const eventDate = new Date(startDate);
-  if (
-    currentTime !== null &&
-    !Number.isNaN(eventDate.getTime()) &&
-    eventDate.getTime() <= currentTime
-  ) {
-    return null;
-  }
+  const queryReminder = data?.sektorelEventReminder ?? null;
+  const currentReminder = manualReminder !== undefined ? manualReminder : queryReminder;
+  const daysBefore = selectedDaysBefore ?? currentReminder?.daysBefore ?? 1;
 
   const handleSave = async () => {
     setMessage("");
@@ -206,7 +187,8 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
         return;
       }
 
-      setCurrentReminder(payload.reminder);
+      setManualReminder(payload.reminder);
+      setSelectedDaysBefore(null);
       setMessage(payload.message || "Hatırlatma kaydedildi.");
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "Hatırlatma kaydedilemedi.");
@@ -234,7 +216,8 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
         return;
       }
 
-      setCurrentReminder(null);
+      setManualReminder(null);
+      setSelectedDaysBefore(null);
       setMessage(payload.message || "Hatırlatma iptal edildi.");
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "Hatırlatma iptal edilemedi.");
@@ -294,7 +277,7 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
               aria-label="Hatırlatma zamanı"
               className="min-w-0 flex-1 border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold text-secondary outline-none focus:border-primary"
               disabled={saving || cancelling}
-              onChange={(event) => setDaysBefore(Number(event.target.value))}
+              onChange={(event) => setSelectedDaysBefore(Number(event.target.value))}
               value={daysBefore}
             >
               <option value={1}>1 gün önce</option>
