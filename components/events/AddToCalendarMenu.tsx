@@ -66,7 +66,7 @@ export default function AddToCalendarMenu({
         </div>
       </details>
 
-      {eventSlug ? <EventReminderControl eventSlug={eventSlug} startDate={event.startDate} /> : null}
+      {eventSlug ? <EventReminderControl eventSlug={eventSlug} /> : null}
     </div>
   );
 }
