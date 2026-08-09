@@ -123,6 +123,11 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
   const [currentReminder, setCurrentReminder] = useState<Reminder | null>(null);
   const [message, setMessage] = useState("");
   const [actionError, setActionError] = useState("");
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(Date.now());
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -171,7 +176,11 @@ export default function EventReminderControl({ eventSlug, startDate }: EventRemi
   }, [data]);
 
   const eventDate = new Date(startDate);
-  if (!Number.isNaN(eventDate.getTime()) && eventDate.getTime() <= Date.now()) {
+  if (
+    currentTime !== null &&
+    !Number.isNaN(eventDate.getTime()) &&
+    eventDate.getTime() <= currentTime
+  ) {
     return null;
   }
 
