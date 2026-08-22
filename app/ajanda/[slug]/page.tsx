@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AddToCalendarMenu from "@/components/events/AddToCalendarMenu";
 import FallbackUI from "@/components/error/FallbackUI";
+import { formatAgendaTime } from "@/lib/agenda";
 import { queryWithFallback } from "@/lib/graphql-client";
 
 const GET_EVENT_DATA = gql`
@@ -147,9 +148,7 @@ export default async function EventDetailPage({
   const formattedDate = startDate
     ? startDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
     : "Tarih belirtilmedi";
-  const formattedTime = startDate
-    ? startDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-    : "Saat belirtilmedi";
+  const formattedTime = formatAgendaTime(details.startDate);
   const endFormattedDate = endDate
     ? endDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })
     : null;

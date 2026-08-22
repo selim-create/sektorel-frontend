@@ -223,9 +223,20 @@ export function formatAgendaDateShort(value?: string | null) {
   return date ? format(date, "d MMM", { locale: tr }) : "--";
 }
 
+export function hasExplicitEventTime(value?: string | null) {
+  if (!value) return false;
+
+  const match = value.trim().match(/[T\s](\d{2}):(\d{2})(?::\d{2})?/);
+  if (!match) return false;
+
+  return match[1] !== "00" || match[2] !== "00";
+}
+
 export function formatAgendaTime(value?: string | null) {
+  if (!hasExplicitEventTime(value)) return "Saat belirtilmedi";
+
   const date = parseEventDate(value);
-  return date ? format(date, "HH:mm", { locale: tr }) : "--:--";
+  return date ? format(date, "HH:mm", { locale: tr }) : "Saat belirtilmedi";
 }
 
 export function formatMonthValue(value: Date) {
