@@ -230,6 +230,19 @@ function sortEvents(events: AgendaEvent[], sort: string) {
   });
 }
 
+function getEventLifecycleEnd(event: AgendaEvent) {
+  const startDate = parseEventDate(event.eventDetails.startDate);
+  if (!startDate) return null;
+
+  const endDate = parseEventDate(event.eventDetails.endDate) ?? startDate;
+  return endOfDay(endDate);
+}
+
+function isCurrentOrUpcomingEvent(event: AgendaEvent, today: Date) {
+  const lifecycleEnd = getEventLifecycleEnd(event);
+  return Boolean(lifecycleEnd && !isBefore(lifecycleEnd, today));
+}
+
 async function fetchAllEvents() {
   const collected: EventNode[] = [];
   let after: string | null = null;
@@ -395,26 +408,17 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   });
 
   const featuredEvents = sortEvents(
-    filteredEvents.filter((event) => {
-      const startDate = parseEventDate(event.eventDetails.startDate);
-      return Boolean(startDate && !isBefore(startDate, today));
-    }),
+    filteredEvents.filter((event) => isCurrentOrUpcomingEvent(event, today)),
     "popularity",
   ).slice(0, 4);
 
   const upcomingEvents = sortEvents(
-    filteredEvents.filter((event) => {
-      const startDate = parseEventDate(event.eventDetails.startDate);
-      return Boolean(startDate && !isBefore(startDate, today));
-    }),
+    filteredEvents.filter((event) => isCurrentOrUpcomingEvent(event, today)),
     sort,
   );
 
   const archiveEvents = sortEvents(
-    filteredEvents.filter((event) => {
-      const startDate = parseEventDate(event.eventDetails.startDate);
-      return Boolean(startDate && isBefore(startDate, today));
-    }),
+    filteredEvents.filter((event) => !isCurrentOrUpcomingEvent(event, today)),
     "date-desc",
   );
 
