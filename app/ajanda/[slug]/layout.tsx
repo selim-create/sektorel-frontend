@@ -18,6 +18,7 @@ const EVENT_SEO_QUERY = gql`
         }
       }
       eventDetails {
+        isOfficial
         eventType
         startDate
         endDate
@@ -26,7 +27,10 @@ const EVENT_SEO_QUERY = gql`
         address
         organizer
         price
+        eventUrl
         registrationLink
+        sourceUrl
+        officialSourceUrl
       }
     }
   }
@@ -40,6 +44,7 @@ type EventSeoData = {
     content?: string | null;
     featuredImage?: { node?: { sourceUrl?: string | null } | null } | null;
     eventDetails?: {
+      isOfficial?: boolean | null;
       eventType?: string | null;
       startDate?: string | null;
       endDate?: string | null;
@@ -48,7 +53,10 @@ type EventSeoData = {
       address?: string | null;
       organizer?: string | null;
       price?: string | null;
+      eventUrl?: string | null;
       registrationLink?: string | null;
+      sourceUrl?: string | null;
+      officialSourceUrl?: string | null;
     } | null;
   } | null;
 };
@@ -102,7 +110,7 @@ export default async function EventLayout({ children, params }: { children: Reac
     location: isOnline
       ? {
           "@type": "VirtualLocation",
-          url: details?.registrationLink || url,
+          url: details?.registrationLink || details?.eventUrl || url,
         }
       : compactObject({
           "@type": "Place",
@@ -125,7 +133,7 @@ export default async function EventLayout({ children, params }: { children: Reac
       price !== null || details?.registrationLink
         ? compactObject({
             "@type": "Offer",
-            url: details?.registrationLink || url,
+            url: details?.registrationLink || details?.eventUrl || url,
             price: price ?? 0,
             priceCurrency: "TRY",
             availability: "https://schema.org/InStock",
@@ -140,10 +148,53 @@ export default async function EventLayout({ children, params }: { children: Reac
     { name: event.title, path: `/ajanda/${event.slug}` },
   ];
 
+  const sourceCandidates = [
+    details?.isOfficial && details?.officialSourceUrl
+      ? { label: "Resmî Kaynak", url: details.officialSourceUrl }
+      : null,
+    details?.eventUrl ? { label: "Etkinlik Sitesi", url: details.eventUrl } : null,
+    details?.sourceUrl ? { label: "Kaynak", url: details.sourceUrl } : null,
+  ].filter((item): item is { label: string; url: string } => Boolean(item?.url));
+
+  const seenUrls = new Set<string>();
+  const sourceLinks = sourceCandidates.filter((item) => {
+    const normalized = item.url.replace(/\/$/, "");
+    if (seenUrls.has(normalized)) return false;
+    seenUrls.add(normalized);
+    return true;
+  });
+
   return (
     <>
       <JsonLd data={[eventSchema, createBreadcrumbSchema(breadcrumbItems)]} />
       {children}
+      {sourceLinks.length > 0 ? (
+        <section className="border-t border-gray-200 bg-white">
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex flex-col gap-4 border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Kaynak ve doğrulama</p>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  Etkinlik bilgilerini doğrulamak veya güncel detayları incelemek için kaynak bağlantılarını kullanabilirsiniz.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sourceLinks.map((item) => (
+                  <a
+                    key={`${item.label}-${item.url}`}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-secondary transition hover:border-primary hover:text-primary"
+                  >
+                    {item.label} ↗
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
