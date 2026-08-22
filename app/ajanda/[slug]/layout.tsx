@@ -70,10 +70,6 @@ async function getEvent(slug: string) {
   return data.event ?? null;
 }
 
-function uniqueSourceLinks(details?: EventSeoData["event"] extends infer T ? never : never) {
-  return details;
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const event = await getEvent(slug);
