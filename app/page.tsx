@@ -109,6 +109,14 @@ function getSectorIcon(iconName?: string | null): LucideIcon {
   return (normalizedName && SECTOR_ICONS[normalizedName]) || Layers;
 }
 
+function pickRandomSectors<T>(items: T[], limit: number) {
+  return [...items]
+    .map((item) => ({ item, sortKey: Math.random() }))
+    .sort((left, right) => left.sortKey - right.sortKey)
+    .slice(0, limit)
+    .map(({ item }) => item);
+}
+
 export default async function Home() {
   const [
     { data: sectorData, hasError: sectorError },
@@ -121,6 +129,7 @@ export default async function Home() {
   ]);
 
   const sectors = sectorData?.sectors?.nodes || [];
+  const homepageSectors = pickRandomSectors(sectors, 10);
   const companies = companyData?.companies?.nodes || [];
   const events = eventData?.events?.nodes || [];
   const hasGraphQLError = sectorError || companyError || eventError;
@@ -196,7 +205,7 @@ export default async function Home() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 border-t border-l border-gray-200">
-            {sectors.map((sector: any) => {
+            {homepageSectors.map((sector: any) => {
               const IconComponent = getSectorIcon(sector.sectorDetails?.iconName);
 
               return (
