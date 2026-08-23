@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, X } from "lucide-react";
 import type { AgendaEvent } from "@/lib/agenda";
-import { formatAgendaDate, formatAgendaTime, getEventTypeClasses, stripHtml } from "@/lib/agenda";
+import { formatAgendaDate, formatAgendaTime, getEventTypeClasses } from "@/lib/agenda";
 import { getAgendaLocationLabel } from "@/lib/agenda-display";
 
 type EventModalProps = {
@@ -31,7 +31,6 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
     return null;
   }
 
-  const description = stripHtml(event.content) || event.excerpt || "Detaylı açıklama mevcut değil.";
   const locationLabel = getAgendaLocationLabel(event.eventDetails, event.city);
 
   return (
@@ -75,8 +74,6 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
               <p>{locationLabel}</p>
             </div>
           </div>
-
-          <p className="text-sm leading-7 text-gray-600">{description}</p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
