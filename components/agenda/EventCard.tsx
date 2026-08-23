@@ -137,8 +137,6 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
             ) : null}
           </div>
 
-          <p className="mt-4 line-clamp-3 text-sm leading-7 text-gray-600">{event.excerpt}</p>
-
           <div className="mt-5 flex flex-wrap gap-2">
             {calendarUrl ? (
               <a
