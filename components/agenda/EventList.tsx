@@ -12,6 +12,8 @@ type EventListProps = {
   description: string;
 };
 
+type PaginationItem = number | "ellipsis-left" | "ellipsis-right";
+
 function buildHref(baseParams: Record<string, string | undefined>, overrides: Record<string, string | undefined>) {
   const params = new URLSearchParams();
 
@@ -24,6 +26,22 @@ function buildHref(baseParams: Record<string, string | undefined>, overrides: Re
   return `/ajanda?${params.toString()}`;
 }
 
+function getPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, "ellipsis-left", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
+}
+
 export default function EventList({
   events,
   currentPage,
@@ -32,12 +50,14 @@ export default function EventList({
   title,
   description,
 }: EventListProps) {
+  const paginationItems = getPaginationItems(currentPage, totalPages);
+
   return (
-    <section className="space-y-5">
+    <section className="min-w-0 space-y-5">
       <div className="border border-gray-200 bg-white px-5 py-5 shadow-sm">
         <p className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">Liste görünümü</p>
         <h2 className="mt-2 flex items-center gap-2 text-2xl font-black text-secondary">
-          <CalendarRange size={22} className="text-primary" />
+          <CalendarRange size={22} className="shrink-0 text-primary" />
           {title}
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-gray-500">{description}</p>
@@ -56,55 +76,70 @@ export default function EventList({
       )}
 
       {totalPages > 1 ? (
-        <div className="flex flex-col gap-3 border border-gray-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm font-medium text-gray-500">
+        <nav
+          className="flex min-w-0 flex-col gap-3 border border-gray-200 bg-white px-4 py-4 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+          aria-label="Ajanda sayfaları"
+        >
+          <div className="shrink-0 text-sm font-medium text-gray-500">
             Sayfa {currentPage} / {totalPages}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildHref(baseParams, {
-                page: currentPage > 1 ? String(currentPage - 1) : undefined,
-              })}
-              className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] ${
-                currentPage > 1
-                  ? "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
-                  : "pointer-events-none border-gray-100 text-gray-300"
-              }`}
-            >
-              <ChevronLeft size={14} /> Önceki
-            </Link>
-            {Array.from({ length: totalPages }).map((_, index) => {
-              const page = index + 1;
-              const isActive = page === currentPage;
 
-              return (
-                <Link
-                  key={page}
-                  href={buildHref(baseParams, { page: page === 1 ? undefined : String(page) })}
-                  className={`inline-flex h-10 w-10 items-center justify-center border text-xs font-black ${
-                    isActive
-                      ? "border-primary bg-primary text-white"
-                      : "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {page}
-                </Link>
-              );
-            })}
-            <Link
-              href={buildHref(baseParams, {
-                page: currentPage < totalPages ? String(currentPage + 1) : String(totalPages),
+          <div className="min-w-0 overflow-x-auto pb-1 lg:pb-0">
+            <div className="flex w-max items-center gap-1.5 whitespace-nowrap">
+              <Link
+                href={buildHref(baseParams, {
+                  page: currentPage > 1 ? String(currentPage - 1) : undefined,
+                })}
+                className={`inline-flex h-9 items-center gap-1 border px-2.5 text-[11px] font-black uppercase tracking-[0.12em] ${
+                  currentPage > 1
+                    ? "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
+                    : "pointer-events-none border-gray-100 text-gray-300"
+                }`}
+              >
+                <ChevronLeft size={13} /> Önceki
+              </Link>
+
+              {paginationItems.map((item) => {
+                if (typeof item !== "number") {
+                  return (
+                    <span key={item} className="inline-flex h-9 w-7 items-center justify-center text-xs font-black text-gray-400">
+                      …
+                    </span>
+                  );
+                }
+
+                const isActive = item === currentPage;
+                return (
+                  <Link
+                    key={item}
+                    href={buildHref(baseParams, { page: item === 1 ? undefined : String(item) })}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`inline-flex h-9 min-w-9 items-center justify-center border px-2 text-xs font-black ${
+                      isActive
+                        ? "border-primary bg-primary text-white"
+                        : "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
+                    }`}
+                  >
+                    {item}
+                  </Link>
+                );
               })}
-              className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] ${
-                currentPage < totalPages
-                  ? "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
-                  : "pointer-events-none border-gray-100 text-gray-300"
-              }`}
-            >
-              Sonraki <ChevronRight size={14} />
-            </Link>
+
+              <Link
+                href={buildHref(baseParams, {
+                  page: currentPage < totalPages ? String(currentPage + 1) : String(totalPages),
+                })}
+                className={`inline-flex h-9 items-center gap-1 border px-2.5 text-[11px] font-black uppercase tracking-[0.12em] ${
+                  currentPage < totalPages
+                    ? "border-gray-200 text-secondary transition hover:border-primary hover:text-primary"
+                    : "pointer-events-none border-gray-100 text-gray-300"
+                }`}
+              >
+                Sonraki <ChevronRight size={13} />
+              </Link>
+            </div>
           </div>
-        </div>
+        </nav>
       ) : null}
     </section>
   );
