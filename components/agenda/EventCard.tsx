@@ -19,6 +19,7 @@ import {
   formatAgendaTime,
   getEventTypeClasses,
 } from "@/lib/agenda";
+import { cleanAgendaText, getAgendaLocationLabel } from "@/lib/agenda-display";
 import EventDetailsPopover from "@/components/agenda/EventDetailsPopover";
 import EventModal from "@/components/agenda/EventModal";
 
@@ -53,6 +54,9 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
   }, [event.slug]);
 
   const calendarUrl = useMemo(() => buildGoogleCalendarUrl(event), [event]);
+  const locationLabel = getAgendaLocationLabel(event.eventDetails, event.city);
+  const organizerLabel = cleanAgendaText(event.eventDetails.organizer);
+  const priceLabel = cleanAgendaText(event.eventDetails.price);
 
   const toggleReminder = useCallback(() => {
     const savedItems = window.localStorage.getItem(STORAGE_KEY);
@@ -81,7 +85,7 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
   }, [event.slug, event.title]);
 
   return (
-    <article className="group relative overflow-visible border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+    <article className="group relative z-0 overflow-visible border border-gray-200 bg-white shadow-sm transition hover:z-30 hover:shadow-xl">
       <div className={`grid gap-5 p-5 ${compact ? "md:grid-cols-[120px_minmax(0,1fr)]" : "lg:grid-cols-[160px_minmax(0,1fr)]"}`}>
         <div className="border border-gray-100 bg-gray-50 p-4 text-center">
           <p className="text-xs font-black uppercase tracking-[0.3em] text-gray-400">Tarih</p>
@@ -117,18 +121,18 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
           <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
             <span className="flex items-center gap-2">
               {event.eventDetails.locationType === "online" ? <Video size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}
-              {event.eventDetails.venue || event.city || "Online"}
+              {locationLabel}
             </span>
-            {event.eventDetails.organizer ? (
+            {organizerLabel ? (
               <span className="flex items-center gap-2">
                 <User2 size={15} className="text-primary" />
-                {event.eventDetails.organizer}
+                {organizerLabel}
               </span>
             ) : null}
-            {event.eventDetails.price ? (
+            {priceLabel ? (
               <span className="flex items-center gap-2">
                 <Ticket size={15} className="text-primary" />
-                {event.eventDetails.price}
+                {priceLabel}
               </span>
             ) : null}
           </div>
@@ -171,8 +175,7 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
                   : "border-gray-200 text-secondary hover:border-primary hover:text-primary"
               }`}
             >
-              <Bell size={14} /> {isSaved ? "Hatırlatılıyor" : "Hatırlat"
-              }
+              <Bell size={14} /> {isSaved ? "Hatırlatılıyor" : "Hatırlat"}
             </button>
           </div>
 
