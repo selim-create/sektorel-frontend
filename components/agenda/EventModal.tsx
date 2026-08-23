@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, X } from "lucide-react";
 import type { AgendaEvent } from "@/lib/agenda";
 import { formatAgendaDate, formatAgendaTime, getEventTypeClasses, stripHtml } from "@/lib/agenda";
+import { getAgendaLocationLabel } from "@/lib/agenda-display";
 
 type EventModalProps = {
   event: AgendaEvent | null;
@@ -31,6 +32,7 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
   }
 
   const description = stripHtml(event.content) || event.excerpt || "Detaylı açıklama mevcut değil.";
+  const locationLabel = getAgendaLocationLabel(event.eventDetails, event.city);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-secondary/70 px-4 py-8" onClick={onClose}>
@@ -70,7 +72,7 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
                 <MapPin size={15} className="text-primary" />
                 Konum
               </p>
-              <p>{event.eventDetails.venue || event.eventDetails.address || event.city || "Online"}</p>
+              <p>{locationLabel}</p>
             </div>
           </div>
 
