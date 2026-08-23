@@ -67,3 +67,9 @@
     color: rgb(var(--foreground));
   }
 }
+
+/* Ajanda overview cards are intentionally metadata-only. Full descriptions live on event detail pages. */
+section.space-y-5 article > p.mt-3.line-clamp-3,
+section.space-y-5 article > div.mt-5.space-y-2 > p:nth-child(2) {
+  display: none;
+}
