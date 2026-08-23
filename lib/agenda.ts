@@ -15,6 +15,7 @@ export type AgendaEvent = {
   date: string | null;
   imageUrl: string | null;
   sectorLabels: AgendaTaxonomy[];
+  locationLabels: AgendaTaxonomy[];
   city: string | null;
   popularityScore: number;
   eventDetails: {
@@ -42,6 +43,22 @@ export const OFFICIAL_CALENDAR_CATEGORIES = [
   { value: "son_basvuru", label: "Son Başvuru" },
   { value: "resmi_yukumluluk", label: "Resmî Yükümlülük" },
 ] as const;
+
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  fuar: "Fuar",
+  konferans: "Konferans / Zirve",
+  kongre: "Kongre",
+  seminer: "Seminer",
+  webinar: "Webinar",
+  egitim: "Eğitim",
+  calistay: "Workshop / Çalıştay",
+  festival: "Festival",
+  yarisma: "Yarışma",
+  networking: "Networking / Buluşma",
+  demo_day: "Demo Day",
+  resmi: "Resmî Takvim",
+  diger: "Diğer",
+};
 
 const TURKISH_CITIES = [
   "Adana",
@@ -181,18 +198,37 @@ export function parsePriceValue(value?: string | null) {
   return numeric ? Number(numeric[0]) : null;
 }
 
+export function getEventTypeLabel(eventType?: string | null) {
+  const value = (eventType ?? "").trim();
+  if (!value) return "Diğer";
+  return EVENT_TYPE_LABELS[value] ?? EVENT_TYPE_LABELS[value.toLocaleLowerCase("tr-TR")] ?? value;
+}
+
+export function getEventPrimaryLabel(event: AgendaEvent) {
+  if (event.eventDetails.isOfficial) {
+    return event.eventDetails.officialInstitution || "Resmî Takvim";
+  }
+
+  const type = (event.eventDetails.eventType || "diger").toLocaleLowerCase("tr-TR");
+  if ((type === "diger" || type === "diğer") && event.sectorLabels[0]) {
+    return event.sectorLabels[0].name;
+  }
+
+  return getEventTypeLabel(type);
+}
+
 export function getEventTypeTone(eventType?: string | null) {
-  const normalized = (eventType ?? "Diğer").toLocaleLowerCase("tr-TR");
+  const normalized = (eventType ?? "diger").toLocaleLowerCase("tr-TR");
 
   if (normalized.includes("konferans") || normalized.includes("zirve") || normalized.includes("fuar")) {
     return "blue";
   }
 
-  if (normalized.includes("seminer") || normalized.includes("webinar")) {
+  if (normalized.includes("seminer") || normalized.includes("webinar") || normalized.includes("egitim")) {
     return "orange";
   }
 
-  if (normalized.includes("workshop") || normalized.includes("atölye")) {
+  if (normalized.includes("workshop") || normalized.includes("atölye") || normalized.includes("calistay")) {
     return "green";
   }
 
@@ -269,7 +305,7 @@ export function getSearchableEventText(event: AgendaEvent) {
     event.title,
     event.content,
     event.excerpt,
-    event.eventDetails.eventType,
+    getEventTypeLabel(event.eventDetails.eventType),
     event.eventDetails.organizer,
     event.eventDetails.venue,
     event.eventDetails.address,
@@ -277,6 +313,7 @@ export function getSearchableEventText(event: AgendaEvent) {
     event.eventDetails.officialCategory,
     event.city,
     ...event.sectorLabels.map((item) => item.name),
+    ...event.locationLabels.map((item) => item.name),
   ]
     .filter(Boolean)
     .join(" ")
