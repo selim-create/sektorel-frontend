@@ -17,6 +17,7 @@ import {
   buildGoogleCalendarUrl,
   formatAgendaDate,
   formatAgendaTime,
+  getEventPrimaryLabel,
   getEventTypeClasses,
 } from "@/lib/agenda";
 import { cleanAgendaText, getAgendaLocationLabel } from "@/lib/agenda-display";
@@ -57,6 +58,8 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
   const locationLabel = getAgendaLocationLabel(event.eventDetails, event.city);
   const organizerLabel = cleanAgendaText(event.eventDetails.organizer);
   const priceLabel = cleanAgendaText(event.eventDetails.price);
+  const primaryLabel = getEventPrimaryLabel(event);
+  const primarySector = event.sectorLabels[0]?.name ?? "";
 
   const toggleReminder = useCallback(() => {
     const savedItems = window.localStorage.getItem(STORAGE_KEY);
@@ -94,44 +97,44 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
           <p className="mt-3 text-xs font-medium text-gray-500">{formatAgendaTime(event.eventDetails.startDate)}</p>
         </div>
 
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.25em] ${getEventTypeClasses(event.eventDetails.eventType)}`}>
-              {event.eventDetails.eventType || "Diğer"}
+            <span className={`inline-flex border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${getEventTypeClasses(event.eventDetails.eventType)}`}>
+              {primaryLabel}
             </span>
             {event.eventDetails.isOfficial ? (
-              <span className="inline-flex border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-red-600">
-                Resmi
+              <span className="inline-flex border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-red-600">
+                Resmî
               </span>
             ) : null}
-            {event.sectorLabels[0] ? (
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
-                {event.sectorLabels[0].name}
+            {primarySector && primarySector !== primaryLabel ? (
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-gray-400">
+                {primarySector}
               </span>
             ) : null}
           </div>
 
-          <Link href={`/ajanda/${event.slug}`} className="mt-3 inline-flex items-start gap-2 text-left">
-            <h3 className="text-xl font-black leading-tight text-secondary transition group-hover:text-primary">
+          <Link href={`/ajanda/${event.slug}`} className="mt-3 inline-flex max-w-full items-start gap-2 text-left">
+            <h3 className="break-words text-xl font-black leading-tight text-secondary transition group-hover:text-primary">
               {event.title}
             </h3>
-            <ExternalLink size={15} className="mt-1 text-gray-300 transition group-hover:text-primary" />
+            <ExternalLink size={15} className="mt-1 shrink-0 text-gray-300 transition group-hover:text-primary" />
           </Link>
 
-          <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
-            <span className="flex items-center gap-2">
-              {event.eventDetails.locationType === "online" ? <Video size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}
-              {locationLabel}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
+            <span className="flex min-w-0 items-center gap-2">
+              {event.eventDetails.locationType === "online" ? <Video size={15} className="shrink-0 text-primary" /> : <MapPin size={15} className="shrink-0 text-primary" />}
+              <span className="break-words">{locationLabel}</span>
             </span>
             {organizerLabel ? (
-              <span className="flex items-center gap-2">
-                <User2 size={15} className="text-primary" />
-                {organizerLabel}
+              <span className="flex min-w-0 items-center gap-2">
+                <User2 size={15} className="shrink-0 text-primary" />
+                <span className="break-words">{organizerLabel}</span>
               </span>
             ) : null}
             {priceLabel ? (
               <span className="flex items-center gap-2">
-                <Ticket size={15} className="text-primary" />
+                <Ticket size={15} className="shrink-0 text-primary" />
                 {priceLabel}
               </span>
             ) : null}
@@ -143,7 +146,7 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
                 href={calendarUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] text-secondary transition hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-secondary transition hover:border-primary hover:text-primary"
               >
                 <CalendarPlus size={14} /> Takvime Ekle
               </a>
@@ -151,7 +154,7 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] text-secondary transition hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-secondary transition hover:border-primary hover:text-primary"
             >
               Hızlı Bakış
             </button>
@@ -160,14 +163,14 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
               onClick={() => {
                 void shareEvent();
               }}
-              className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] text-secondary transition hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-secondary transition hover:border-primary hover:text-primary"
             >
               <Share2 size={14} /> Paylaş
             </button>
             <button
               type="button"
               onClick={toggleReminder}
-              className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] transition ${
+              className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] transition ${
                 isSaved
                   ? "border-primary bg-primary text-white"
                   : "border-gray-200 text-secondary hover:border-primary hover:text-primary"
