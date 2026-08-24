@@ -37,6 +37,7 @@ const linkGroups = [
     links: [
       { label: "Hakkımızda", href: "/hakkimizda" },
       { label: "Reklam Verin", href: "/reklam-verin" },
+      { label: "Yardım & Destek", href: "/yardim" },
       { label: "İletişim", href: "/iletisim" },
     ],
   },
