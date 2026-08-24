@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/error/ErrorBoundary";
 import { createApolloErrorLink, GRAPHQL_ENDPOINT } from "@/lib/error-handler";
 import { getValidAccessToken } from "@/lib/auth";
 import { createApolloCache } from "@/lib/apollo-cache";
+import { trackSuccessfulMutation } from "@/lib/analytics";
 
 function makeClient() {
   const httpLink = new HttpLink({
@@ -47,6 +48,21 @@ function makeClient() {
     });
   });
 
+  const analyticsLink = new ApolloLink((operation, forward) => {
+    return new Observable((observer) => {
+      const subscription = forward(operation).subscribe({
+        next: (value) => {
+          trackSuccessfulMutation(operation.operationName, operation.variables, value.data);
+          observer.next(value);
+        },
+        error: (error) => observer.error(error),
+        complete: () => observer.complete(),
+      });
+
+      return () => subscription.unsubscribe();
+    });
+  });
+
   const transportLink = typeof window === "undefined"
     ? ApolloLink.from([
         new SSRMultipartLink({ stripDefer: true }),
@@ -62,6 +78,7 @@ function makeClient() {
     },
     link: ApolloLink.from([
       createApolloErrorLink(typeof window === "undefined" ? "ssr" : "client"),
+      analyticsLink,
       transportLink,
     ]),
   });
