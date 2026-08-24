@@ -12,7 +12,7 @@ import { GET_ALL_SECTORS } from "@/lib/queries";
 
 export const metadata: Metadata = {
   title: "Firma Rehberi | Sektörel Ajanda",
-  description: "Sektör ve şehir filtresiyle firmaları keşfedin, onaylı şirketleri öne çıkaran firma listesine göz atın.",
+  description: "Sektör ve şehir filtresiyle firmaları keşfedin, öne çıkan şirketleri ve sektör oyuncularını inceleyin.",
 };
 
 export const revalidate = 60;
@@ -33,6 +33,12 @@ const DIRECTORY_QUERY = gql`
         content
         date
         sektorelViewCount
+        sektorelDirectoryMeta {
+          isFeatured
+          origin
+          ownershipStatus
+          priorityTier
+        }
         companyDetails {
           isVerified
           email
@@ -60,6 +66,12 @@ type Company = {
   content?: string | null;
   date?: string | null;
   sektorelViewCount?: number | null;
+  sektorelDirectoryMeta?: {
+    isFeatured?: boolean | null;
+    origin?: string | null;
+    ownershipStatus?: string | null;
+    priorityTier?: number | null;
+  } | null;
   companyDetails?: {
     isVerified?: boolean | null;
     email?: string | null;
@@ -128,7 +140,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
   const q = single(resolved.q).trim();
   const sector = single(resolved.sector).trim();
   const location = single(resolved.location).trim();
-  const sort = single(resolved.sort).trim() || "newest";
+  const sort = single(resolved.sort).trim() || "priority";
   const verified = single(resolved.verified).trim() === "true";
   const page = Math.max(1, Number.parseInt(single(resolved.page), 10) || 1);
 
@@ -179,7 +191,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
     );
   }
 
-  const featuredCompanies = companies.filter((company) => company.companyDetails?.isVerified).slice(0, 4);
+  const featuredCompanies = companies.filter((company) => company.sektorelDirectoryMeta?.isFeatured).slice(0, 4);
   const featuredIds = new Set(featuredCompanies.map((company) => company.id));
   const regularCompanies = companies.filter((company) => !featuredIds.has(company.id));
   const activeFilterCount = [sector, location, q, verified ? "true" : ""].filter(Boolean).length;
@@ -187,7 +199,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
     ...(q ? { q } : {}),
     ...(sector ? { sector } : {}),
     ...(location ? { location } : {}),
-    ...(sort !== "newest" ? { sort } : {}),
+    ...(sort !== "priority" ? { sort } : {}),
     ...(verified ? { verified: "true" } : {}),
   };
 
@@ -237,7 +249,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
               <section className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Star size={16} className="text-primary" />
-                  <h2 className="text-xl font-black text-secondary">Öne Çıkan Onaylı Firmalar</h2>
+                  <h2 className="text-xl font-black text-secondary">Öne Çıkan Firmalar</h2>
                 </div>
                 <CompanyGrid companies={featuredCompanies} featured />
               </section>
