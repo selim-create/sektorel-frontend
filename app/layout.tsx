@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import CookieConsent from "@/components/privacy/CookieConsent";
 import JsonLd from "@/components/seo/JsonLd";
 import { ApolloWrapper } from "@/lib/apollo-wrapper";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/site";
@@ -85,6 +86,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <CookieConsent />
         </ApolloWrapper>
       </body>
     </html>
