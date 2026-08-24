@@ -7,11 +7,12 @@ type CompanySortProps = {
 };
 
 const SORT_OPTIONS = [
+  { value: "priority", label: "Önerilen Sıralama" },
   { value: "alphabetical", label: "Alfabetik (A-Z)" },
   { value: "newest", label: "En Yeni" },
   { value: "oldest", label: "En Eski" },
   { value: "verified", label: "Doğrulanmış Önce" },
-  { value: "views", label: "Most Viewed" },
+  { value: "views", label: "En Çok Görüntülenen" },
 ];
 
 export default function CompanySort({
