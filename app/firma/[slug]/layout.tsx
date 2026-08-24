@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
+import CompanyClaimControl from "@/components/companies/CompanyClaimControl";
 import JsonLd from "@/components/seo/JsonLd";
 import { queryWithFallback } from "@/lib/graphql-client";
 import {
@@ -230,6 +231,9 @@ export default async function CompanyLayout({
     <>
       <JsonLd data={[localBusinessSchema, breadcrumbSchema]} />
       {children}
+      <div className="fixed bottom-4 right-4 z-40 w-[min(24rem,calc(100vw-2rem))]">
+        <CompanyClaimControl companySlug={company.slug} />
+      </div>
     </>
   );
 }
