@@ -250,7 +250,7 @@ export default async function Home() {
                   <div className="flex items-start justify-between mb-6">
                     <div className="w-16 h-16 border border-gray-100 bg-gray-50 p-2 flex items-center justify-center">
                       <img
-                        src={company.companyDetails?.coverImage || `https://placehold.co/100x100?text=${(company.title || "FI").substring(0, 2)}`}
+                        src={company.featuredImage?.node?.sourceUrl || company.companyDetails?.coverImage || `https://placehold.co/100x100?text=${(company.title || "FI").substring(0, 2)}`}
                         alt={company.title || "Firma"}
                         className="w-full h-full object-contain filter grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500"
                       />
