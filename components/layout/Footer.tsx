@@ -71,11 +71,6 @@ export default function Footer() {
               <img src="/sektorel-ajanda-logo-white.svg" alt="Sektörel Ajanda" className="h-10 w-auto" />
             </Link>
             <p className="mt-5 text-sm leading-7 text-slate-400">Türkiye&apos;deki firmaları, sektörleri, etkinlikleri, haberleri, ticari fırsatları ve kariyer ilanlarını tek merkezde buluşturan iş dünyası platformu.</p>
-            <div className="mt-6 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-300">
-              <span className="border border-white/10 bg-white/5 px-3 py-2">Firma Rehberi</span>
-              <span className="border border-white/10 bg-white/5 px-3 py-2">Sektörel Ajanda</span>
-              <span className="border border-white/10 bg-white/5 px-3 py-2">İş Fırsatları</span>
-            </div>
           </div>
 
           {linkGroups.map(({ title, icon: Icon, links }) => (
