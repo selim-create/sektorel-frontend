@@ -52,7 +52,10 @@ function makeClient() {
     return new Observable((observer) => {
       const subscription = forward(operation).subscribe({
         next: (value) => {
-          trackSuccessfulMutation(operation.operationName, operation.variables, value.data);
+          const operationName = operation.operationName;
+          if (operationName) {
+            trackSuccessfulMutation(operationName, operation.variables, value.data);
+          }
           observer.next(value);
         },
         error: (error) => observer.error(error),
