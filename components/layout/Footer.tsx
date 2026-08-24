@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, Building2, MapPinned, Newspaper } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Building2, MapPinned, Newspaper, ShieldCheck } from "lucide-react";
 
 const linkGroups = [
   {
@@ -41,6 +41,18 @@ const linkGroups = [
       { label: "İletişim", href: "/iletisim" },
     ],
   },
+  {
+    title: "Bilgilendirme",
+    icon: ShieldCheck,
+    links: [
+      { label: "Kullanım Koşulları", href: "/kullanim-kosullari" },
+      { label: "Gizlilik Politikası", href: "/gizlilik-politikasi" },
+      { label: "Çerez Politikası", href: "/cerez-politikasi" },
+      { label: "Çerez Tercihleri", href: "/cerez-tercihleri" },
+      { label: "KVKK", href: "/kvkk" },
+      { label: "Aydınlatma Metni", href: "/aydinlatma-metni" },
+    ],
+  },
 ];
 
 export default function Footer() {
@@ -65,7 +77,7 @@ export default function Footer() {
       </div>
 
       <div className="container mx-auto px-4 py-12 md:py-14">
-        <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-[1.35fr_repeat(4,1fr)] xl:gap-8">
+        <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-[1.35fr_repeat(5,1fr)] xl:gap-7">
           <div className="max-w-sm">
             <Link href="/" aria-label="Sektörel Ajanda ana sayfa" className="inline-block">
               <img src="/sektorel-ajanda-logo-white.svg" alt="Sektörel Ajanda" className="h-10 w-auto" />
