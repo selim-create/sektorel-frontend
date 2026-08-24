@@ -83,6 +83,14 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
   { url: absoluteUrl("/harita"), changeFrequency: "weekly", priority: 0.7 },
   { url: absoluteUrl("/hakkimizda"), changeFrequency: "monthly", priority: 0.5 },
   { url: absoluteUrl("/iletisim"), changeFrequency: "monthly", priority: 0.5 },
+  { url: absoluteUrl("/reklam-verin"), changeFrequency: "monthly", priority: 0.5 },
+  { url: absoluteUrl("/yardim"), changeFrequency: "monthly", priority: 0.5 },
+  { url: absoluteUrl("/kullanim-kosullari"), changeFrequency: "yearly", priority: 0.3 },
+  { url: absoluteUrl("/gizlilik-politikasi"), changeFrequency: "yearly", priority: 0.3 },
+  { url: absoluteUrl("/cerez-politikasi"), changeFrequency: "yearly", priority: 0.3 },
+  { url: absoluteUrl("/cerez-tercihleri"), changeFrequency: "yearly", priority: 0.2 },
+  { url: absoluteUrl("/kvkk"), changeFrequency: "yearly", priority: 0.3 },
+  { url: absoluteUrl("/aydinlatma-metni"), changeFrequency: "yearly", priority: 0.3 },
 ];
 
 async function postGraphQL<TData>(
