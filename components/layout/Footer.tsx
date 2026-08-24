@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, Building2, CalendarDays, MapPinned, Newspaper } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Building2, MapPinned, Newspaper } from "lucide-react";
 
 const linkGroups = [
   {
@@ -36,6 +36,7 @@ const linkGroups = [
     icon: Building2,
     links: [
       { label: "Hakkımızda", href: "/hakkimizda" },
+      { label: "Reklam Verin", href: "/reklam-verin" },
       { label: "İletişim", href: "/iletisim" },
     ],
   },
