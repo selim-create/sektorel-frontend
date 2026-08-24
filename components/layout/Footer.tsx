@@ -36,6 +36,7 @@ const linkGroups = [
     icon: Building2,
     links: [
       { label: "Hakkımızda", href: "/hakkimizda" },
+      { label: "Reklam Verin", href: "/reklam-verin" },
       { label: "İletişim", href: "/iletisim" },
     ],
   },
