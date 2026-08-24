@@ -54,14 +54,16 @@ export default function CookieConsent() {
   const [advertising, setAdvertising] = useState(false);
 
   useEffect(() => {
-    const existing = readConsent();
-    if (existing) {
-      setAnalytics(existing.analytics);
-      setAdvertising(existing.advertising);
-    } else {
-      setOpen(true);
-    }
-    setMounted(true);
+    const timeoutId = window.setTimeout(() => {
+      const existing = readConsent();
+      if (existing) {
+        setAnalytics(existing.analytics);
+        setAdvertising(existing.advertising);
+      } else {
+        setOpen(true);
+      }
+      setMounted(true);
+    }, 0);
 
     const openPreferences = () => {
       const current = readConsent();
@@ -71,7 +73,10 @@ export default function CookieConsent() {
       setOpen(true);
     };
     window.addEventListener("sektorel:open-cookie-preferences", openPreferences);
-    return () => window.removeEventListener("sektorel:open-cookie-preferences", openPreferences);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("sektorel:open-cookie-preferences", openPreferences);
+    };
   }, []);
 
   if (!mounted || !open) return null;
