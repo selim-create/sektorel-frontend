@@ -26,6 +26,31 @@ function analyticsAllowed() {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function successfulPayload(payload: Record<string, unknown>, key: string) {
+  const result = asRecord(payload[key]);
+  return result?.success === true ? result : null;
+}
+
+function inputRecord(variables: Record<string, unknown>) {
+  return asRecord(variables.input) ?? {};
+}
+
+function stringParam(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function numberParam(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function booleanParam(value: unknown) {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 export function trackAnalyticsEvent(eventName: string, params: AnalyticsEventParams = {}) {
   if (!analyticsAllowed()) return;
 
@@ -40,44 +65,105 @@ export function trackAnalyticsEvent(eventName: string, params: AnalyticsEventPar
 }
 
 export function trackSuccessfulMutation(operationName: string, variables: Record<string, unknown>, data: unknown) {
-  if (!data || typeof data !== "object") return;
-
-  const payload = data as Record<string, unknown>;
+  const payload = asRecord(data);
+  if (!payload) return;
 
   if (operationName === "LoginUser") {
-    const login = payload.login;
-    if (login && typeof login === "object") {
-      const session = login as Record<string, unknown>;
-      if (session.authToken && session.refreshToken && session.user) {
-        trackAnalyticsEvent("login", { method: "password" });
-      }
+    const login = asRecord(payload.login);
+    if (login?.authToken && login.refreshToken && login.user) {
+      trackAnalyticsEvent("login", { method: "password" });
     }
     return;
   }
 
   if (operationName === "RegisterUser") {
-    const register = payload.registerSektorelUser;
-    if (register && typeof register === "object" && (register as Record<string, unknown>).success === true) {
+    if (successfulPayload(payload, "registerSektorelUser")) {
       trackAnalyticsEvent("sign_up", {
         method: "email",
-        account_type: typeof variables.accountType === "string" ? variables.accountType : "unknown",
+        account_type: stringParam(variables.accountType) ?? "unknown",
       });
     }
     return;
   }
 
   if (operationName === "SubmitCompany") {
-    const company = payload.submitCompany;
-    if (company && typeof company === "object" && (company as Record<string, unknown>).success === true) {
+    if (successfulPayload(payload, "submitCompany")) {
       trackAnalyticsEvent("company_submit", { source: "company_form" });
     }
     return;
   }
 
   if (operationName === "RequestCompanyClaim") {
-    const claim = payload.requestCompanyClaim;
-    if (claim && typeof claim === "object" && (claim as Record<string, unknown>).success === true) {
+    if (successfulPayload(payload, "requestCompanyClaim")) {
       trackAnalyticsEvent("company_claim_request", { source: "company_profile" });
+    }
+    return;
+  }
+
+  if (operationName === "SubmitLead") {
+    if (successfulPayload(payload, "submitSektorelLead")) {
+      const input = inputRecord(variables);
+      trackAnalyticsEvent("lead_submit", {
+        lead_type: stringParam(input.leadType),
+        hidden_name: booleanParam(input.isHiddenName),
+      });
+    }
+    return;
+  }
+
+  if (operationName === "SubmitJob") {
+    if (successfulPayload(payload, "submitSektorelJob")) {
+      const input = inputRecord(variables);
+      trackAnalyticsEvent("job_submit", {
+        work_type: stringParam(input.workType),
+        experience: stringParam(input.experience),
+      });
+    }
+    return;
+  }
+
+  if (operationName === "SubmitEvent") {
+    if (successfulPayload(payload, "submitSektorelEvent")) {
+      const input = inputRecord(variables);
+      trackAnalyticsEvent("event_submit", {
+        event_type: stringParam(input.eventType),
+        location_type: stringParam(input.locationType),
+      });
+    }
+    return;
+  }
+
+  if (operationName === "SaveSektorelEventReminder") {
+    if (successfulPayload(payload, "saveSektorelEventReminder")) {
+      const input = inputRecord(variables);
+      trackAnalyticsEvent("event_reminder_set", {
+        days_before: numberParam(input.daysBefore),
+      });
+    }
+    return;
+  }
+
+  if (operationName === "CancelSektorelEventReminder") {
+    if (successfulPayload(payload, "cancelSektorelEventReminder")) {
+      trackAnalyticsEvent("event_reminder_cancel");
+    }
+    return;
+  }
+
+  if (operationName === "SubmitSektorelOffer") {
+    if (successfulPayload(payload, "submitSektorelOffer")) {
+      const input = inputRecord(variables);
+      trackAnalyticsEvent("offer_submit", {
+        currency: stringParam(input.currency),
+        includes_shipping: booleanParam(input.includesShipping),
+      });
+    }
+    return;
+  }
+
+  if (operationName === "SubmitSektorelJobApplication") {
+    if (successfulPayload(payload, "submitSektorelJobApplication")) {
+      trackAnalyticsEvent("job_apply", { source: "job_detail" });
     }
   }
 }
