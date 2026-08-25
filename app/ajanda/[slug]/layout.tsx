@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata, isValidDate, parseNumericPrice } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
+import type { RankMathSeo } from "@/lib/rank-math-seo";
 import { absoluteUrl, compactObject, stripHtml, truncateText } from "@/lib/site";
 
 const EVENT_SEO_QUERY = gql`
@@ -12,6 +13,18 @@ const EVENT_SEO_QUERY = gql`
       title
       slug
       content
+      sektorelSeo {
+        title
+        description
+        canonicalUrl
+        robots
+        openGraphTitle
+        openGraphDescription
+        openGraphImage
+        twitterTitle
+        twitterDescription
+        twitterImage
+      }
       featuredImage {
         node {
           sourceUrl
@@ -42,6 +55,7 @@ type EventSeoData = {
     title?: string | null;
     slug?: string | null;
     content?: string | null;
+    sektorelSeo?: RankMathSeo | null;
     featuredImage?: { node?: { sourceUrl?: string | null } | null } | null;
     eventDetails?: {
       isOfficial?: boolean | null;
@@ -81,6 +95,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     fallbackDescription: `${event?.title || "Etkinlik"} tarih, yer ve kayıt bilgileri.`,
     image: event?.featuredImage?.node?.sourceUrl,
     type: "website",
+    seo: event?.sektorelSeo,
   });
 }
 
