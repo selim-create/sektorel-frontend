@@ -55,11 +55,12 @@ type CompanyCombinationResponse = {
 };
 
 type ConnectionDefinition = {
-  name: "companies" | "sectors" | "posts" | "events" | "leads" | "jobs";
+  name: "companies" | "sectors" | "posts" | "events" | "leads" | "jobs" | "categories" | "tags";
   path: string;
   changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
   priority: number;
   hasModified: boolean;
+  whereClause?: string;
 };
 
 const CONNECTIONS: ConnectionDefinition[] = [
@@ -69,6 +70,22 @@ const CONNECTIONS: ConnectionDefinition[] = [
   { name: "events", path: "/ajanda", changeFrequency: "daily", priority: 0.7, hasModified: true },
   { name: "leads", path: "/firsatlar", changeFrequency: "daily", priority: 0.7, hasModified: true },
   { name: "jobs", path: "/kariyer", changeFrequency: "daily", priority: 0.7, hasModified: true },
+  {
+    name: "categories",
+    path: "/haberler/kategori",
+    changeFrequency: "daily",
+    priority: 0.65,
+    hasModified: false,
+    whereClause: ", where: { hideEmpty: true }",
+  },
+  {
+    name: "tags",
+    path: "/haberler/etiket",
+    changeFrequency: "daily",
+    priority: 0.55,
+    hasModified: false,
+    whereClause: ", where: { hideEmpty: true }",
+  },
 ];
 
 const STATIC_ROUTES: MetadataRoute.Sitemap = [
@@ -125,7 +142,7 @@ async function fetchConnection(definition: ConnectionDefinition) {
     const nodeFields = definition.hasModified ? "slug modified" : "slug";
     const query = `
       query Sitemap${definition.name}($first: Int!, $after: String) {
-        ${definition.name}(first: $first, after: $after) {
+        ${definition.name}(first: $first, after: $after${definition.whereClause ?? ""}) {
           nodes { ${nodeFields} }
           pageInfo { hasNextPage endCursor }
         }
