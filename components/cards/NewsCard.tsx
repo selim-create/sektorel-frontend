@@ -83,7 +83,7 @@ export default function NewsCard({ post }: NewsCardProps) {
           {categoryBadges.map((category) => (
             <Link
               className="bg-orange-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary hover:text-white"
-              href={`/haberler?category=${encodeURIComponent(category.slug ?? "")}`}
+              href={`/haberler/kategori/${encodeURIComponent(category.slug ?? "")}`}
               key={category.id ?? `${slug}-${category.slug}`}
             >
               {category.name}
