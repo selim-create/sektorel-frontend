@@ -1,5 +1,6 @@
 import { gql } from "@apollo/client";
 import { queryWithFallback } from "@/lib/graphql-client";
+import type { RankMathSeo } from "@/lib/rank-math-seo";
 
 export type NewsArchivePost = {
   id: string;
@@ -33,6 +34,7 @@ export type NewsTaxonomyArchive = {
   slug?: string | null;
   description?: string | null;
   count?: number | null;
+  sektorelSeo?: RankMathSeo | null;
   posts?: {
     nodes?: Array<NewsArchivePost | null> | null;
     pageInfo?: {
@@ -83,8 +85,24 @@ const POST_FIELDS = gql`
   }
 `;
 
+const SEO_FIELDS = gql`
+  fragment NewsTaxonomySeoFields on SektorelSeo {
+    title
+    description
+    canonicalUrl
+    robots
+    openGraphTitle
+    openGraphDescription
+    openGraphImage
+    twitterTitle
+    twitterDescription
+    twitterImage
+  }
+`;
+
 const GET_CATEGORY_ARCHIVE = gql`
   ${POST_FIELDS}
+  ${SEO_FIELDS}
   query GetNewsCategoryArchive($slug: ID!, $after: String) {
     category(id: $slug, idType: SLUG) {
       id
@@ -92,6 +110,9 @@ const GET_CATEGORY_ARCHIVE = gql`
       slug
       description
       count
+      sektorelSeo {
+        ...NewsTaxonomySeoFields
+      }
       posts(first: 24, after: $after) {
         nodes {
           ...NewsTaxonomyPostFields
@@ -107,6 +128,7 @@ const GET_CATEGORY_ARCHIVE = gql`
 
 const GET_TAG_ARCHIVE = gql`
   ${POST_FIELDS}
+  ${SEO_FIELDS}
   query GetNewsTagArchive($slug: ID!, $after: String) {
     tag(id: $slug, idType: SLUG) {
       id
@@ -114,6 +136,9 @@ const GET_TAG_ARCHIVE = gql`
       slug
       description
       count
+      sektorelSeo {
+        ...NewsTaxonomySeoFields
+      }
       posts(first: 24, after: $after) {
         nodes {
           ...NewsTaxonomyPostFields
