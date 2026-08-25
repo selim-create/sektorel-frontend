@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata, isValidDate } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
+import type { RankMathSeo } from "@/lib/rank-math-seo";
 import { absoluteUrl, compactObject, stripHtml } from "@/lib/site";
 
 const JOB_SEO_QUERY = gql`
@@ -13,6 +14,18 @@ const JOB_SEO_QUERY = gql`
       slug
       date
       content
+      sektorelSeo {
+        title
+        description
+        canonicalUrl
+        robots
+        openGraphTitle
+        openGraphDescription
+        openGraphImage
+        twitterTitle
+        twitterDescription
+        twitterImage
+      }
       jobDetails {
         companyName
         location
@@ -33,6 +46,7 @@ type JobSeoData = {
     slug?: string | null;
     date?: string | null;
     content?: string | null;
+    sektorelSeo?: RankMathSeo | null;
     jobDetails?: {
       companyName?: string | null;
       location?: string | null;
@@ -64,6 +78,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     descriptionSource: job?.content,
     fallbackDescription: `${job?.title || "İş ilanı"} başvuru ve pozisyon detayları.`,
     type: "website",
+    seo: job?.sektorelSeo,
   });
 }
 

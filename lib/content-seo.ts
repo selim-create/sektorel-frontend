@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applyRankMathMetadata, type RankMathSeo } from "@/lib/rank-math-seo";
 import { absoluteUrl, SITE_NAME, stripHtml, truncateText } from "@/lib/site";
 
 type ContentMetadataInput = {
@@ -12,6 +13,7 @@ type ContentMetadataInput = {
   publishedTime?: string | null;
   modifiedTime?: string | null;
   authors?: string[];
+  seo?: RankMathSeo | null;
 };
 
 export function createContentMetadata(input: ContentMetadataInput): Metadata {
@@ -28,7 +30,7 @@ export function createContentMetadata(input: ContentMetadataInput): Metadata {
   );
   const image = input.image || undefined;
 
-  return {
+  const fallback: Metadata = {
     title: input.title,
     description,
     alternates: { canonical: canonicalPath },
@@ -50,6 +52,8 @@ export function createContentMetadata(input: ContentMetadataInput): Metadata {
       images: image ? [image] : undefined,
     },
   };
+
+  return applyRankMathMetadata(fallback, input.seo);
 }
 
 export function createBreadcrumbSchema(items: Array<{ name: string; path: string }>) {

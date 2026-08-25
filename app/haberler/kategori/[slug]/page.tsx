@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import NewsTaxonomyArchiveView from "@/components/news/NewsTaxonomyArchive";
 import { getNewsCategoryArchive } from "@/lib/news-taxonomy";
+import { applyRankMathMetadata } from "@/lib/rank-math-seo";
 
 export const revalidate = 60;
 
@@ -29,11 +30,21 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     archive.description?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() ||
     `${name} kategorisindeki güncel sektörel haberler ve gelişmeler.`;
 
+  const metadata = applyRankMathMetadata(
+    {
+      title: `${name} Haberleri`,
+      description,
+      alternates: { canonical },
+    },
+    archive.sektorelSeo,
+  );
+
+  if (!after) return metadata;
+
   return {
-    title: `${name} Haberleri`,
-    description,
-    alternates: { canonical },
-    robots: after ? { index: false, follow: true } : undefined,
+    ...metadata,
+    alternates: { ...(metadata.alternates ?? {}), canonical },
+    robots: { index: false, follow: true },
   };
 }
 

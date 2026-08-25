@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import CompanyClaimControl from "@/components/companies/CompanyClaimControl";
 import JsonLd from "@/components/seo/JsonLd";
 import { queryWithFallback } from "@/lib/graphql-client";
+import { applyRankMathMetadata, type RankMathSeo } from "@/lib/rank-math-seo";
 import {
   absoluteUrl,
   compactObject,
@@ -18,6 +19,18 @@ const COMPANY_SEO_QUERY = gql`
       title
       slug
       content
+      sektorelSeo {
+        title
+        description
+        canonicalUrl
+        robots
+        openGraphTitle
+        openGraphDescription
+        openGraphImage
+        twitterTitle
+        twitterDescription
+        twitterImage
+      }
       featuredImage {
         node {
           sourceUrl
@@ -60,6 +73,7 @@ type CompanySeoData = {
     title?: string | null;
     slug?: string | null;
     content?: string | null;
+    sektorelSeo?: RankMathSeo | null;
     featuredImage?: { node?: { sourceUrl?: string | null } | null } | null;
     companyDetails?: {
       email?: string | null;
@@ -122,7 +136,7 @@ export async function generateMetadata({
     company.featuredImage?.node?.sourceUrl ||
     undefined;
 
-  return {
+  const fallback: Metadata = {
     title: company.title,
     description,
     alternates: { canonical: canonicalPath },
@@ -141,6 +155,8 @@ export async function generateMetadata({
       images: image ? [image] : undefined,
     },
   };
+
+  return applyRankMathMetadata(fallback, company.sektorelSeo);
 }
 
 export default async function CompanyLayout({

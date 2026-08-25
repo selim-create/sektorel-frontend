@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
+import type { RankMathSeo } from "@/lib/rank-math-seo";
 import { absoluteUrl, SITE_NAME, stripHtml, truncateText } from "@/lib/site";
 
 const NEWS_SEO_QUERY = gql`
@@ -15,6 +16,18 @@ const NEWS_SEO_QUERY = gql`
       modified
       excerpt
       content
+      sektorelSeo {
+        title
+        description
+        canonicalUrl
+        robots
+        openGraphTitle
+        openGraphDescription
+        openGraphImage
+        twitterTitle
+        twitterDescription
+        twitterImage
+      }
       featuredImage {
         node {
           sourceUrl
@@ -44,6 +57,7 @@ type NewsSeoData = {
     modified?: string | null;
     excerpt?: string | null;
     content?: string | null;
+    sektorelSeo?: RankMathSeo | null;
     featuredImage?: { node?: { sourceUrl?: string | null } | null } | null;
     author?: { node?: { name?: string | null } | null } | null;
     categories?: { nodes?: Array<{ name?: string | null; slug?: string | null } | null> | null } | null;
@@ -74,6 +88,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     publishedTime: post?.date,
     modifiedTime: post?.modified,
     authors: post?.author?.node?.name ? [post.author.node.name] : undefined,
+    seo: post?.sektorelSeo,
   });
 }
 
