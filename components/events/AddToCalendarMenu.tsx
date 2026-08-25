@@ -1,5 +1,8 @@
+"use client";
+
 import { Calendar, ChevronDown, Download } from "lucide-react";
 import EventReminderControl from "@/components/events/EventReminderControl";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 import {
   buildGoogleCalendarUrl,
   buildIcsDataUrl,
@@ -16,6 +19,10 @@ function getEventSlug(url?: string | null) {
 
   const match = url.match(/\/ajanda\/([^/?#]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function trackCalendarProvider(provider: "google" | "outlook" | "ics") {
+  trackAnalyticsEvent("add_to_calendar", { provider });
 }
 
 export default function AddToCalendarMenu({
@@ -40,6 +47,7 @@ export default function AddToCalendarMenu({
           <a
             className="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
             href={googleUrl}
+            onClick={() => trackCalendarProvider("google")}
             rel="noopener noreferrer"
             target="_blank"
           >
@@ -49,6 +57,7 @@ export default function AddToCalendarMenu({
           <a
             className="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
             href={outlookUrl}
+            onClick={() => trackCalendarProvider("outlook")}
             rel="noopener noreferrer"
             target="_blank"
           >
@@ -59,6 +68,7 @@ export default function AddToCalendarMenu({
             className="flex items-center justify-between px-4 py-3 text-sm font-bold text-secondary transition-colors hover:bg-gray-50 hover:text-primary"
             download={fileName}
             href={icsUrl}
+            onClick={() => trackCalendarProvider("ics")}
           >
             Apple / Diğer (.ics)
             <Download size={15} />
