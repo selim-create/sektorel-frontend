@@ -3,6 +3,7 @@ import { gql } from "@apollo/client";
 import JsonLd from "@/components/seo/JsonLd";
 import { createBreadcrumbSchema, createContentMetadata, isValidDate } from "@/lib/content-seo";
 import { queryWithFallback } from "@/lib/graphql-client";
+import type { RankMathSeo } from "@/lib/rank-math-seo";
 import { absoluteUrl, compactObject, stripHtml, truncateText } from "@/lib/site";
 
 const LEAD_SEO_QUERY = gql`
@@ -13,6 +14,18 @@ const LEAD_SEO_QUERY = gql`
       slug
       date
       content
+      sektorelSeo {
+        title
+        description
+        canonicalUrl
+        robots
+        openGraphTitle
+        openGraphDescription
+        openGraphImage
+        twitterTitle
+        twitterDescription
+        twitterImage
+      }
       leadDetails {
         leadType
         status
@@ -37,6 +50,7 @@ type LeadSeoData = {
     slug?: string | null;
     date?: string | null;
     content?: string | null;
+    sektorelSeo?: RankMathSeo | null;
     leadDetails?: {
       leadType?: string | null;
       status?: string | null;
@@ -67,6 +81,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     descriptionSource: lead?.content,
     fallbackDescription: `${lead?.title || "Ticari fırsat"} için detay ve teklif bilgileri.`,
     type: "website",
+    seo: lead?.sektorelSeo,
   });
 }
 
