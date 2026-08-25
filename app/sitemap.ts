@@ -7,15 +7,17 @@ type SitemapNode = {
   modified?: string | null;
 };
 
+type ConnectionPageInfo = {
+  hasNextPage?: boolean | null;
+  endCursor?: string | null;
+};
+
 type ConnectionResponse = {
   data?: Record<
     string,
     {
       nodes?: SitemapNode[] | null;
-      pageInfo?: {
-        hasNextPage?: boolean | null;
-        endCursor?: string | null;
-      } | null;
+      pageInfo?: ConnectionPageInfo | null;
     } | null
   >;
 };
@@ -47,10 +49,7 @@ type CompanyCombinationResponse = {
   data?: {
     companies?: {
       nodes?: Array<CompanyCombinationNode | null> | null;
-      pageInfo?: {
-        hasNextPage?: boolean | null;
-        endCursor?: string | null;
-      } | null;
+      pageInfo?: ConnectionPageInfo | null;
     } | null;
   };
 };
@@ -111,10 +110,16 @@ async function postGraphQL<TData>(
   return (await response.json()) as TData;
 }
 
+function getNextCursor(pageInfo?: ConnectionPageInfo | null, seenCursors?: Set<string>) {
+  if (!pageInfo?.hasNextPage || !pageInfo.endCursor) return null;
+  if (seenCursors?.has(pageInfo.endCursor)) return null;
+  return pageInfo.endCursor;
+}
+
 async function fetchConnection(definition: ConnectionDefinition) {
   const nodes: SitemapNode[] = [];
+  const seenCursors = new Set<string>();
   let after: string | null = null;
-  let page = 0;
 
   do {
     const nodeFields = definition.hasModified ? "slug modified" : "slug";
@@ -134,11 +139,12 @@ async function fetchConnection(definition: ConnectionDefinition) {
     const connection = payload.data?.[definition.name];
 
     nodes.push(...(connection?.nodes ?? []));
-    after = connection?.pageInfo?.hasNextPage
-      ? connection.pageInfo.endCursor ?? null
-      : null;
-    page += 1;
-  } while (after && page < 50);
+
+    const nextCursor = getNextCursor(connection?.pageInfo, seenCursors);
+    if (!nextCursor) break;
+    seenCursors.add(nextCursor);
+    after = nextCursor;
+  } while (after);
 
   return nodes
     .filter((node): node is SitemapNode & { slug: string } => Boolean(node.slug))
@@ -202,8 +208,8 @@ async function fetchLocationRoutes(): Promise<MetadataRoute.Sitemap> {
 
 async function fetchCompanyCombinationNodes() {
   const nodes: CompanyCombinationNode[] = [];
+  const seenCursors = new Set<string>();
   let after: string | null = null;
-  let page = 0;
 
   do {
     const query = `
@@ -230,11 +236,12 @@ async function fetchCompanyCombinationNodes() {
         (node): node is CompanyCombinationNode => Boolean(node),
       ),
     );
-    after = connection?.pageInfo?.hasNextPage
-      ? connection.pageInfo.endCursor ?? null
-      : null;
-    page += 1;
-  } while (after && page < 50);
+
+    const nextCursor = getNextCursor(connection?.pageInfo, seenCursors);
+    if (!nextCursor) break;
+    seenCursors.add(nextCursor);
+    after = nextCursor;
+  } while (after);
 
   return nodes;
 }
