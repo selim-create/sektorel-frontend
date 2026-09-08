@@ -24,6 +24,18 @@ export const GET_AGENDA_EVENTS_PAGINATED = gql`
           officialInstitution
           officialSourceUrl
         }
+        sectors {
+          nodes {
+            name
+            slug
+          }
+        }
+        locations {
+          nodes {
+            name
+            slug
+          }
+        }
         featuredImage {
           node {
             sourceUrl

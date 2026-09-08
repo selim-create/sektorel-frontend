@@ -4,7 +4,12 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, X } from "lucide-react";
 import type { AgendaEvent } from "@/lib/agenda";
-import { formatAgendaDate, formatAgendaTime, getEventTypeClasses } from "@/lib/agenda";
+import {
+  formatAgendaDate,
+  formatAgendaTime,
+  getEventPrimaryLabel,
+  getEventTypeClasses,
+} from "@/lib/agenda";
 import { getAgendaLocationLabel } from "@/lib/agenda-display";
 
 type EventModalProps = {
@@ -40,16 +45,16 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
-          <div>
-            <span className={`inline-flex border px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] ${getEventTypeClasses(event.eventDetails.eventType)}`}>
-              {event.eventDetails.eventType || "Diğer"}
+          <div className="min-w-0">
+            <span className={`inline-flex max-w-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${getEventTypeClasses(event.eventDetails.eventType)}`}>
+              <span className="truncate">{getEventPrimaryLabel(event)}</span>
             </span>
-            <h3 className="mt-3 text-2xl font-black text-secondary">{event.title}</h3>
+            <h3 className="mt-3 break-words text-2xl font-black text-secondary">{event.title}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="border border-gray-200 p-2 text-gray-500 transition hover:border-primary hover:text-primary"
+            className="shrink-0 border border-gray-200 p-2 text-gray-500 transition hover:border-primary hover:text-primary"
             aria-label="Kapat"
           >
             <X size={18} />
@@ -71,7 +76,7 @@ export default function EventModal({ event, isOpen, onClose }: EventModalProps) 
                 <MapPin size={15} className="text-primary" />
                 Konum
               </p>
-              <p>{locationLabel}</p>
+              <p className="break-words">{locationLabel}</p>
             </div>
           </div>
 

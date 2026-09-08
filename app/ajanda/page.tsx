@@ -31,15 +31,15 @@ import {
   type AgendaTaxonomy,
   extractLikelyCity,
   formatMonthValue,
+  getEventPrimaryLabel,
   getSearchableEventText,
   parseEventDate,
   parsePriceValue,
-  slugify,
   stripHtml,
 } from "@/lib/agenda";
+import { getAgendaLocationLabel } from "@/lib/agenda-display";
 import { GET_AGENDA_EVENTS_PAGINATED } from "@/lib/agenda-queries";
 import { queryWithFallback } from "@/lib/graphql-client";
-import { GET_ALL_SECTORS } from "@/lib/queries";
 
 export const revalidate = 60;
 
@@ -50,12 +50,6 @@ const EVENTS_FALLBACK = {
       endCursor: null as string | null,
       hasNextPage: false,
     },
-  },
-};
-
-const SECTORS_FALLBACK = {
-  sectors: {
-    nodes: [] as SectorNode[],
   },
 };
 
@@ -75,6 +69,13 @@ type SearchParams = Promise<{
   priceMax?: string | string[];
   date?: string | string[];
 }>;
+
+type TaxonomyConnection = {
+  nodes?: Array<{
+    name?: string | null;
+    slug?: string | null;
+  }> | null;
+};
 
 type EventNode = {
   id?: string | null;
@@ -97,6 +98,8 @@ type EventNode = {
     officialInstitution?: string | null;
     officialSourceUrl?: string | null;
   } | null;
+  sectors?: TaxonomyConnection | null;
+  locations?: TaxonomyConnection | null;
   featuredImage?: {
     node?: {
       sourceUrl?: string | null;
@@ -111,17 +114,6 @@ type EventsQueryData = {
       endCursor?: string | null;
       hasNextPage?: boolean | null;
     } | null;
-  } | null;
-};
-
-type SectorNode = {
-  name?: string | null;
-  slug?: string | null;
-};
-
-type SectorsQueryData = {
-  sectors?: {
-    nodes?: SectorNode[] | null;
   } | null;
 };
 
@@ -147,33 +139,23 @@ function getMonthDate(value: string) {
   return new Date(year, month - 1, 1);
 }
 
-function buildSectorMatches(text: string, sectors: AgendaTaxonomy[]) {
-  return sectors.filter((sector) => text.includes(sector.name.toLocaleLowerCase("tr-TR")));
+function normalizeTaxonomy(connection?: TaxonomyConnection | null): AgendaTaxonomy[] {
+  return (connection?.nodes ?? [])
+    .filter((item): item is { name: string; slug: string } => Boolean(item?.name && item.slug))
+    .map((item) => ({ name: item.name.trim(), slug: item.slug.trim() }))
+    .filter((item) => Boolean(item.name && item.slug));
 }
 
-function normalizeEvent(node: EventNode, sectors: AgendaTaxonomy[]): AgendaEvent | null {
+function normalizeEvent(node: EventNode): AgendaEvent | null {
   if (!node.id || !node.slug) {
     return null;
   }
 
   const details = node.eventDetails ?? {};
   const excerpt = stripHtml(node.content).slice(0, 220) || "Etkinlik detayları yakında paylaşılacak.";
-  const searchableText = [
-    node.title,
-    node.content,
-    details.eventType,
-    details.organizer,
-    details.venue,
-    details.address,
-    details.officialCategory,
-    details.officialInstitution,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
-
-  const sectorLabels = buildSectorMatches(searchableText, sectors);
-  const city = extractLikelyCity(details.venue, details.address, node.content);
+  const sectorLabels = normalizeTaxonomy(node.sectors);
+  const locationLabels = normalizeTaxonomy(node.locations);
+  const city = locationLabels[0]?.name ?? extractLikelyCity(details.venue, details.address);
   const popularityScore =
     (details.isOfficial ? 1500 : 0) +
     (node.featuredImage?.node?.sourceUrl ? 400 : 0) +
@@ -189,10 +171,11 @@ function normalizeEvent(node: EventNode, sectors: AgendaTaxonomy[]): AgendaEvent
     date: node.date ?? null,
     imageUrl: node.featuredImage?.node?.sourceUrl ?? null,
     sectorLabels,
+    locationLabels,
     city,
     popularityScore,
     eventDetails: {
-      eventType: details.eventType?.trim() || "Diğer",
+      eventType: details.eventType?.trim() || "diger",
       isOfficial: Boolean(details.isOfficial),
       startDate: details.startDate ?? node.date ?? null,
       endDate: details.endDate ?? null,
@@ -250,7 +233,7 @@ async function fetchAllEvents() {
   let hasError = false;
   let safetyCounter = 0;
 
-  while (hasNextPage && safetyCounter < 5 && collected.length < 300) {
+  while (hasNextPage && safetyCounter < 20) {
     safetyCounter += 1;
 
     const result: { data: EventsQueryData; hasError: boolean } = await queryWithFallback<
@@ -274,6 +257,10 @@ async function fetchAllEvents() {
     collected.push(...nodes);
     after = pageInfo?.endCursor ?? null;
     hasNextPage = Boolean(pageInfo?.hasNextPage && after);
+
+    if (!nodes.length) {
+      break;
+    }
   }
 
   return {
@@ -305,7 +292,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
   const resolvedSearchParams = await searchParams;
   const viewParam = getSingleValue(resolvedSearchParams.view);
-  const view = viewParam === "list" ? "list" : "calendar";
+  const view = viewParam === "calendar" ? "calendar" : "list";
   const scopeParam = getSingleValue(resolvedSearchParams.scope);
   const scope = scopeParam === "official" || scopeParam === "events" ? scopeParam : "all";
   const officialCategory = getSingleValue(resolvedSearchParams.officialCategory);
@@ -322,21 +309,13 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const priceMax = getSingleValue(resolvedSearchParams.priceMax) || "50000";
   const monthDate = getMonthDate(monthValue);
 
-  const [eventsResult, sectorsResult] = await Promise.all([
-    fetchAllEvents(),
-    queryWithFallback<SectorsQueryData>({ query: GET_ALL_SECTORS }, SECTORS_FALLBACK, "agenda sectors"),
-  ]);
-
-  const sectorCatalog = (sectorsResult.data?.sectors?.nodes ?? [])
-    .filter((item): item is SectorNode & { name: string; slug: string } => Boolean(item?.name && item.slug))
-    .map((item) => ({ name: item.name, slug: item.slug }));
-
+  const eventsResult = await fetchAllEvents();
   const normalizedEvents = eventsResult.nodes
-    .map((node) => normalizeEvent(node, sectorCatalog))
+    .map((node) => normalizeEvent(node))
     .filter((item): item is AgendaEvent => Boolean(item))
     .filter((item) => Boolean(parseEventDate(item.eventDetails.startDate)));
 
-  if ((eventsResult.hasError || sectorsResult.hasError) && normalizedEvents.length === 0) {
+  if (eventsResult.hasError && normalizedEvents.length === 0) {
     return (
       <FallbackUI
         title="Etkinlik ajandası yüklenemedi"
@@ -377,12 +356,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       return false;
     }
 
-    if (location) {
-      const locationSlug = slugify(location);
-      const eventLocationSlug = slugify(event.city || event.eventDetails.venue || "");
-      if (!eventLocationSlug || eventLocationSlug !== locationSlug) {
-        return false;
-      }
+    if (location && !event.locationLabels.some((item) => item.slug === location)) {
+      return false;
     }
 
     if (normalizedQuery && !getSearchableEventText(event).includes(normalizedQuery)) {
@@ -446,15 +421,29 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const safePage = Math.min(currentPage, totalPages);
   const paginatedList = listSource.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  const filterOptionEvents = normalizedEvents.filter((event) => {
+    if (!isCurrentOrUpcomingEvent(event, today)) return false;
+    if (scope === "official" && !event.eventDetails.isOfficial) return false;
+    if (scope === "events" && event.eventDetails.isOfficial) return false;
+    return true;
+  });
+
   const eventTypes = Array.from(
-    new Set(normalizedEvents.filter((event) => !event.eventDetails.isOfficial).map((event) => event.eventDetails.eventType)),
+    new Set(
+      filterOptionEvents
+        .filter((event) => !event.eventDetails.isOfficial)
+        .map((event) => event.eventDetails.eventType)
+        .filter(Boolean),
+    ),
   ).sort((left, right) => left.localeCompare(right, "tr"));
-  const matchedSectors = Array.from(
-    new Map(filteredEvents.flatMap((event) => event.sectorLabels).map((item) => [item.slug, item])).values(),
+
+  const sectorOptions = Array.from(
+    new Map(filterOptionEvents.flatMap((event) => event.sectorLabels).map((item) => [item.slug, item])).values(),
   ).sort((left, right) => left.name.localeCompare(right.name, "tr"));
-  const locationOptions = Array.from(new Set(normalizedEvents.map((event) => event.city).filter(Boolean) as string[])).sort((left, right) =>
-    left.localeCompare(right, "tr"),
-  );
+
+  const locationOptions = Array.from(
+    new Map(filterOptionEvents.flatMap((event) => event.locationLabels).map((item) => [item.slug, item])).values(),
+  ).sort((left, right) => left.name.localeCompare(right.name, "tr"));
 
   const baseParams = {
     ...(scope !== "all" ? { scope } : {}),
@@ -467,7 +456,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     ...(to ? { to } : {}),
     ...(sort !== "date-asc" ? { sort } : {}),
     ...(priceMax !== "50000" && scope !== "official" ? { priceMax } : {}),
-    ...(view === "list" ? { view } : {}),
+    ...(view === "calendar" ? { view } : {}),
     month: monthValue,
     ...(selectedDate ? { date: selectedDate } : {}),
   };
@@ -482,9 +471,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       ? "Yaklaşan resmî ve mali tarihler"
       : scope === "events"
         ? "Yaklaşan etkinlikler"
-        : view === "list"
-          ? "Tüm yaklaşan ajanda kayıtları"
-          : "Yaklaşan ajanda kayıtları";
+        : "Tüm yaklaşan ajanda kayıtları";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
@@ -534,7 +521,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               <p className="mt-3 text-3xl font-black">{normalizedEvents.filter((event) => event.eventDetails.isOfficial).length}</p>
             </div>
             <div className="border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Şehir</p>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-gray-400">Lokasyon</p>
               <p className="mt-3 text-3xl font-black">{locationOptions.length}</p>
             </div>
           </div>
@@ -542,7 +529,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       </section>
 
       <div className="container mx-auto space-y-10 px-4 py-10">
-        {eventsResult.hasError || sectorsResult.hasError ? (
+        {eventsResult.hasError ? (
           <div className="border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-700">
             Bazı etkinlik verileri geçici olarak alınamadı. Sayfa mevcut içeriklerle gösteriliyor.
           </div>
@@ -564,15 +551,14 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               {featuredEvents.map((event) => (
-                <article key={event.id} className="border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                  <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.25em] ${event.eventDetails.isOfficial ? "text-red-600" : "text-primary"}`}>
-                    <Star size={13} /> {event.eventDetails.isOfficial ? event.eventDetails.officialInstitution || "Resmî Takvim" : event.eventDetails.eventType}
+                <article key={event.id} className="min-w-0 border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                  <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] ${event.eventDetails.isOfficial ? "text-red-600" : "text-primary"}`}>
+                    <Star size={13} className="shrink-0" /> {getEventPrimaryLabel(event)}
                   </div>
-                  <h3 className="mt-4 line-clamp-2 text-xl font-black text-secondary">{event.title}</h3>
-                  <p className="mt-3 line-clamp-3 text-sm leading-7 text-gray-500">{event.excerpt}</p>
+                  <h3 className="mt-4 line-clamp-2 break-words text-xl font-black text-secondary">{event.title}</h3>
                   <div className="mt-5 space-y-2 text-sm text-gray-500">
-                    <p className="flex items-center gap-2"><CalendarRange size={15} className="text-primary" /> {format(parseEventDate(event.eventDetails.startDate)!, "d MMMM yyyy", { locale: tr })}</p>
-                    <p className="flex items-center gap-2"><MapPin size={15} className="text-primary" /> {event.eventDetails.isOfficial ? event.eventDetails.officialInstitution || "Türkiye" : event.eventDetails.venue || event.city || "Online"}</p>
+                    <p className="flex items-center gap-2"><CalendarRange size={15} className="shrink-0 text-primary" /> {format(parseEventDate(event.eventDetails.startDate)!, "d MMMM yyyy", { locale: tr })}</p>
+                    <p className="flex min-w-0 items-center gap-2"><MapPin size={15} className="shrink-0 text-primary" /> <span className="truncate">{event.eventDetails.isOfficial ? event.eventDetails.officialInstitution || "Türkiye" : getAgendaLocationLabel(event.eventDetails, event.city)}</span></p>
                   </div>
                   <Link href={`/ajanda/${event.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-secondary transition hover:text-primary">
                     İncele <ChevronRight size={14} />
@@ -583,8 +569,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           </section>
         ) : null}
 
-        <div className="grid gap-8 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="space-y-6">
+        <div className="grid min-w-0 gap-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-6">
             <EventFilters
               currentFilters={{
                 view,
@@ -602,7 +588,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
                 date: selectedDate,
               }}
               eventTypes={eventTypes}
-              sectorOptions={matchedSectors.length > 0 ? matchedSectors : sectorCatalog}
+              sectorOptions={sectorOptions}
               locationOptions={locationOptions}
               resultCount={filteredEvents.length}
               hasViewParam={Boolean(viewParam)}
@@ -628,8 +614,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
             </section>
           </div>
 
-          <div className="space-y-8">
-            {view !== "list" ? (
+          <div className="min-w-0 space-y-8">
+            {view === "calendar" ? (
               <EventCalendar
                 events={calendarEvents}
                 monthDate={monthDate}
@@ -651,7 +637,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
                     ? "Vergi, SGK, beyanname, teşvik ve diğer resmî yükümlülük tarihlerini yaklaşan tarihe göre takip edin."
                     : scope === "events"
                       ? "Fuar, webinar, konferans, eğitim ve diğer sektörel etkinlikleri yaklaşan tarihe göre keşfedin."
-                      : "Takvim üzerinde işaretli günler arasından seçim yapabilir veya yaklaşan ajanda kayıtlarını aşağıdan inceleyebilirsiniz."
+                      : "Yaklaşan sektörel etkinlikleri ve resmî ajanda kayıtlarını tek listede inceleyebilirsiniz."
               }
             />
           </div>
