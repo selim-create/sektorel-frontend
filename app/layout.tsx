@@ -4,6 +4,7 @@ import "./globals.css";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import LegacyNewsletterBridge from "@/components/newsletter/LegacyNewsletterBridge";
 import CookieConsent from "@/components/privacy/CookieConsent";
 import JsonLd from "@/components/seo/JsonLd";
 import { ApolloWrapper } from "@/lib/apollo-wrapper";
@@ -87,6 +88,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <LegacyNewsletterBridge />
           <GoogleAnalytics />
           <CookieConsent />
         </ApolloWrapper>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NewsletterForm from "@/components/newsletter/NewsletterForm";
 import { ArrowRight, BriefcaseBusiness, Building2, MapPinned, Newspaper, ShieldCheck } from "lucide-react";
 
 const linkGroups = [
@@ -58,6 +59,8 @@ const linkGroups = [
 export default function Footer() {
   return (
     <footer className="mt-16 border-t border-slate-200 bg-secondary text-white">
+      <NewsletterForm source="sektorel-ajanda_footer" />
+
       <div className="border-b border-white/10 bg-white/[0.03]">
         <div className="container mx-auto flex flex-col gap-6 px-4 py-8 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl">
@@ -88,18 +91,12 @@ export default function Footer() {
           {linkGroups.map(({ title, icon: Icon, links }) => (
             <div key={title}>
               <div className="mb-5 flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center bg-primary/15 text-primary">
-                  <Icon size={16} />
-                </span>
+                <span className="flex h-8 w-8 items-center justify-center bg-primary/15 text-primary"><Icon size={16} /></span>
                 <h3 className="text-sm font-black uppercase tracking-wider text-white">{title}</h3>
               </div>
               <ul className="space-y-3">
                 {links.map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-slate-400 transition hover:text-white">
-                      {link.label}
-                    </Link>
-                  </li>
+                  <li key={link.href}><Link href={link.href} className="text-sm text-slate-400 transition hover:text-white">{link.label}</Link></li>
                 ))}
               </ul>
             </div>
