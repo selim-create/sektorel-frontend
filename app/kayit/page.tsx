@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { REGISTER_MUTATION } from "@/lib/mutations";
 import { GET_ALL_SECTORS } from "@/lib/queries";
-import { User, Building2, CheckCircle, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { subscribeToPrimaryNewsletters } from "@/lib/newsletter-client";
+import { User, Building2, CheckCircle, ArrowRight, AlertCircle, Loader2, Mail } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [accountType, setAccountType] = useState<"bireysel" | "kurumsal">("kurumsal");
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
   
   // Sektör Seçim State'leri
   const [selectedMainSector, setSelectedMainSector] = useState("");
@@ -40,6 +42,9 @@ export default function RegisterPage() {
   const [register, { loading }] = useMutation(REGISTER_MUTATION, {
     onCompleted: (data) => {
       if (data.registerSektorelUser.success) {
+        if (newsletterOptIn && formData.email) {
+          void subscribeToPrimaryNewsletters(formData.email, "sektorel-ajanda_registration");
+        }
         setSuccessMsg("Kayıt başarılı! Giriş sayfasına yönlendiriliyorsunuz...");
         setTimeout(() => router.push("/giris"), 2000);
       } else {
@@ -231,6 +236,24 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
+
+            <div className="border border-orange-100 bg-orange-50/60 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={newsletterOptIn}
+                  onChange={(event) => setNewsletterOptIn(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-orange-600"
+                />
+                <span className="flex min-w-0 gap-3">
+                  <Mail size={17} className="mt-0.5 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-xs font-black text-secondary">Sektörel Ajanda bültenini de almak istiyorum.</span>
+                    <span className="mt-1 block text-[11px] leading-5 text-gray-500">İş dünyası gündemi, yaklaşan etkinlikler ve yeni fırsatlardan seçilmiş içerikler e-postanıza gelsin. Bu tercih isteğe bağlıdır ve hesap oluşturmanızı etkilemez.</span>
+                  </span>
+                </span>
+              </label>
+            </div>
 
             <div className="flex items-start gap-2 pt-2">
               <input type="checkbox" required className="accent-primary w-4 h-4 mt-0.5 rounded-none" />
