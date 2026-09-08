@@ -97,7 +97,7 @@ export default function NewsletterForm({ source, variant = "footer" }: Props) {
           <div className="border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-700"><strong>Seçimin kaydedildi.</strong><br />{message}</div>
         ) : (
           <>
-            {!loading && primary.length > 0 ? (
+            {!loading && primary.length > 1 ? (
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {primary.map((option) => {
                   const checked = selected.includes(option.slug);
@@ -134,52 +134,60 @@ export default function NewsletterForm({ source, variant = "footer" }: Props) {
   }
 
   return (
-    <section className="border-b border-white/10 bg-white/[0.035]">
-      <div className="container mx-auto grid gap-7 px-4 py-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-        <div>
-          <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary"><Mail className="h-4 w-4" /> Sektörel Ajanda Bülteni</span>
-          <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight text-white md:text-3xl">İş dünyasının gündemi, yaklaşan etkinlikler ve yeni fırsatlar tek e-postada.</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Sektörler, mevzuat, etkinlikler, firmalar, ticari fırsatlar ve kariyer başlıklarından editör seçkileri.</p>
+    <div className="bg-white p-5 shadow-[0_18px_60px_rgba(17,24,39,0.08)] sm:p-6 md:p-7">
+      {status === "success" ? (
+        <div className="flex items-start gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check className="h-5 w-5" /></span>
+          <div>
+            <p className="text-sm font-black text-secondary">Seçimin kaydedildi.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{message}</p>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">E-posta listesi</p>
+              <p className="mt-1 text-sm font-bold text-secondary">Sektörel Ajanda seçkisine katılın.</p>
+            </div>
+            <Mail className="h-5 w-5 text-primary" />
+          </div>
 
-        <div>
-          {status === "success" ? (
-            <div className="flex items-start gap-3 border border-emerald-400/20 bg-emerald-400/10 p-4 text-white"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-emerald-700"><Check className="h-4 w-4" /></span><div><p className="text-sm font-bold">Seçimin kaydedildi.</p><p className="mt-1 text-xs leading-5 text-slate-300">{message}</p></div></div>
-          ) : (
-            <>
-              {!loading ? (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {primary.map((option) => {
-                    const checked = selected.includes(option.slug);
-                    return (
-                      <label key={option.slug} className={`cursor-pointer border px-3 py-2 text-[10px] font-black uppercase tracking-wide transition ${checked ? "border-white/40 bg-white text-secondary" : "border-white/15 bg-white/5 text-slate-500"}`}>
-                        <input className="sr-only" type="checkbox" checked={checked} onChange={() => setSelected((current) => current.includes(option.slug) ? current.filter((item) => item !== option.slug) : current.concat(option.slug))} />
-                        {checked ? "✓ " : "○ "}{option.name}
-                      </label>
-                    );
-                  })}
-                  {network.length > 0 ? <button type="button" onClick={() => setModalOpen(true)} className="border border-primary/60 bg-primary/10 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-primary transition hover:bg-primary hover:text-white">hiposta. keşfet {selectedNetwork.length ? `+${selectedNetwork.length}` : ""}</button> : null}
-                </div>
-              ) : <p className="mb-3 text-xs text-slate-500">Bültenler hazırlanıyor...</p>}
+          {primary.length > 1 && !loading ? (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {primary.map((option) => {
+                const checked = selected.includes(option.slug);
+                return (
+                  <label key={option.slug} className={`cursor-pointer border px-3 py-2 text-[10px] font-black uppercase tracking-wide transition ${checked ? "border-primary bg-orange-50 text-primary" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
+                    <input className="sr-only" type="checkbox" checked={checked} onChange={() => setSelected((current) => current.includes(option.slug) ? current.filter((item) => item !== option.slug) : current.concat(option.slug))} />
+                    {checked ? "✓ " : "○ "}{option.name}
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
 
-              <form onSubmit={submit}>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="E-posta adresiniz" className="min-w-0 border border-white/15 bg-white px-4 py-3 text-sm text-secondary outline-none focus:border-primary" required />
-                  <button type="submit" disabled={submitting || loading || selected.length === 0 || !consent} className="inline-flex items-center justify-center gap-2 bg-primary px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-500">{submitting ? "Kaydediliyor..." : <>Abone Ol <ArrowRight className="h-4 w-4" /></>}</button>
-                </div>
-                <input type="text" value={website} onChange={(event) => setWebsite(event.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute left-[-9999px] h-px w-px opacity-0" />
-              </form>
+          <form onSubmit={submit}>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="E-posta adresiniz" className="min-w-0 border border-slate-200 bg-[#faf9f6] px-4 py-3.5 text-sm text-secondary outline-none transition focus:border-primary focus:bg-white" required />
+              <button type="submit" disabled={submitting || loading || selected.length === 0 || !consent} className="inline-flex items-center justify-center gap-2 bg-secondary px-6 py-3.5 text-xs font-black uppercase tracking-wider text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">{submitting ? "Kaydediliyor..." : <>Abone Ol <ArrowRight className="h-4 w-4" /></>}</button>
+            </div>
+            <input type="text" value={website} onChange={(event) => setWebsite(event.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute left-[-9999px] h-px w-px opacity-0" />
+          </form>
 
-              <label className="mt-2.5 flex cursor-pointer items-start gap-2 text-[10px] leading-5 text-slate-500">
-                <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-orange-600" />
-                <span>Seçtiğim bültenleri e-posta ile almak istiyorum. <Link href="/gizlilik-politikasi" className="font-semibold text-slate-300 underline">Gizlilik</Link> ve <Link href="/kvkk" className="font-semibold text-slate-300 underline">KVKK</Link> metinlerini inceledim.</span>
-              </label>
-              {status === "error" ? <p className="mt-2 text-xs font-semibold text-red-300">{message}</p> : null}
-            </>
-          )}
-        </div>
-      </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <label className="flex max-w-xl cursor-pointer items-start gap-2 text-[10px] leading-5 text-slate-500">
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-orange-600" />
+              <span>E-posta ile bülten almak istiyorum. <Link href="/gizlilik-politikasi" className="font-semibold text-secondary underline">Gizlilik</Link> ve <Link href="/kvkk" className="font-semibold text-secondary underline">KVKK</Link> metinlerini inceledim.</span>
+            </label>
+            {network.length > 0 ? <button type="button" onClick={() => setModalOpen(true)} className="shrink-0 text-left text-[10px] font-black uppercase tracking-[0.12em] text-primary transition hover:text-secondary sm:text-right">hiposta. diğer bültenler {selectedNetwork.length ? `+${selectedNetwork.length}` : ""}</button> : null}
+          </div>
+
+          {status === "error" ? <p className="mt-3 text-xs font-semibold text-red-600">{message}</p> : null}
+        </>
+      )}
+
       {modalOpen ? <HipostaNewsletterModal open options={network} selected={selectedNetwork} onClose={closeModal} onApply={applyNetwork} /> : null}
-    </section>
+    </div>
   );
 }
