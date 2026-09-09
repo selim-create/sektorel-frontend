@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CONSENT_STORAGE_KEY,
   type ConsentPreferences,
@@ -53,6 +53,18 @@ function ensureGtag() {
   return window.gtag;
 }
 
+function setDefaultConsent() {
+  const gtag = ensureGtag();
+
+  gtag("consent", "default", {
+    analytics_storage: "denied",
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+    wait_for_update: 500,
+  });
+}
+
 function applyConsent(consent: ConsentPreferences | null) {
   const gtag = ensureGtag();
 
@@ -64,85 +76,90 @@ function applyConsent(consent: ConsentPreferences | null) {
   });
 }
 
+function sendPageView(pathname: string) {
+  const gtag = ensureGtag();
+  gtag("event", "page_view", {
+    page_location: window.location.href,
+    page_path: pathname,
+    page_title: document.title,
+  });
+}
+
 export default function GoogleAnalytics() {
   const pathname = usePathname();
-  const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
+  const [consentInitialized, setConsentInitialized] = useState(false);
+  const [analyticsAllowed, setAnalyticsAllowed] = useState<boolean | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
+  const configuredRef = useRef(false);
+  const previousAnalyticsAllowedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const consent = readConsent();
-      applyConsent(consent);
-      setAnalyticsAllowed(Boolean(consent?.analytics));
-    }, 0);
+    setDefaultConsent();
+
+    const consent = readConsent();
+    applyConsent(consent);
+    setAnalyticsAllowed(Boolean(consent?.analytics));
+    setConsentInitialized(true);
 
     const handleConsentChanged = (event: Event) => {
       const customEvent = event as CustomEvent<ConsentPreferences>;
-      const consent = customEvent.detail ?? readConsent();
-      applyConsent(consent);
-      setAnalyticsAllowed(Boolean(consent?.analytics));
+      const nextConsent = customEvent.detail ?? readConsent();
+      applyConsent(nextConsent);
+      setAnalyticsAllowed(Boolean(nextConsent?.analytics));
     };
 
     window.addEventListener("sektorel:consent-changed", handleConsentChanged);
 
     return () => {
-      window.clearTimeout(timeoutId);
       window.removeEventListener("sektorel:consent-changed", handleConsentChanged);
     };
   }, []);
 
   useEffect(() => {
-    if (!analyticsAllowed || !scriptReady || !pathname) return;
+    if (!scriptReady || !pathname) return;
+    sendPageView(pathname);
+  }, [pathname, scriptReady]);
 
-    const gtag = ensureGtag();
-    gtag("event", "page_view", {
-      page_location: window.location.href,
-      page_path: pathname,
-      page_title: document.title,
-    });
+  useEffect(() => {
+    const previous = previousAnalyticsAllowedRef.current;
+
+    if (
+      scriptReady &&
+      pathname &&
+      previous === false &&
+      analyticsAllowed === true
+    ) {
+      sendPageView(pathname);
+    }
+
+    previousAnalyticsAllowedRef.current = analyticsAllowed;
   }, [analyticsAllowed, pathname, scriptReady]);
 
-  if (!analyticsAllowed) return null;
+  const initializeAnalytics = () => {
+    if (configuredRef.current) {
+      setScriptReady(true);
+      return;
+    }
+
+    const gtag = ensureGtag();
+    gtag("js", new Date());
+    gtag("config", GA_MEASUREMENT_ID, {
+      send_page_view: false,
+    });
+
+    configuredRef.current = true;
+    setScriptReady(true);
+  };
+
+  if (!consentInitialized) return null;
 
   return (
-    <>
-      <Script
-        id="google-consent-default"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = window.gtag || gtag;
-            gtag('consent', 'default', {
-              analytics_storage: 'denied',
-              ad_storage: 'denied',
-              ad_user_data: 'denied',
-              ad_personalization: 'denied',
-              wait_for_update: 500
-            });
-          `,
-        }}
-      />
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script
-        id="google-analytics-config"
-        strategy="afterInteractive"
-        onReady={() => {
-          const consent = readConsent();
-          applyConsent(consent);
-
-          const gtag = ensureGtag();
-          gtag("js", new Date());
-          gtag("config", GA_MEASUREMENT_ID, {
-            send_page_view: false,
-          });
-          setScriptReady(true);
-        }}
-      />
-    </>
+    <Script
+      id="google-analytics"
+      src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+      strategy="afterInteractive"
+      onLoad={initializeAnalytics}
+      onReady={initializeAnalytics}
+    />
   );
 }
