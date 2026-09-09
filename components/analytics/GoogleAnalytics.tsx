@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   CONSENT_STORAGE_KEY,
   type ConsentPreferences,
@@ -53,6 +53,18 @@ function ensureGtag() {
   return window.gtag;
 }
 
+function setDefaultConsent() {
+  const gtag = ensureGtag();
+
+  gtag("consent", "default", {
+    analytics_storage: "denied",
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+    wait_for_update: 500,
+  });
+}
+
 function applyConsent(consent: ConsentPreferences | null) {
   const gtag = ensureGtag();
 
@@ -64,85 +76,68 @@ function applyConsent(consent: ConsentPreferences | null) {
   });
 }
 
+function sendPageView(pathname: string) {
+  const gtag = ensureGtag();
+  gtag("event", "page_view", {
+    page_location: window.location.href,
+    page_path: pathname,
+    page_title: document.title,
+  });
+}
+
 export default function GoogleAnalytics() {
   const pathname = usePathname();
-  const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
-  const [scriptReady, setScriptReady] = useState(false);
+  const configuredRef = useRef(false);
+  const currentPathRef = useRef(pathname);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const consent = readConsent();
-      applyConsent(consent);
-      setAnalyticsAllowed(Boolean(consent?.analytics));
-    }, 0);
+    currentPathRef.current = pathname;
 
+    if (configuredRef.current && pathname) {
+      sendPageView(pathname);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     const handleConsentChanged = (event: Event) => {
       const customEvent = event as CustomEvent<ConsentPreferences>;
       const consent = customEvent.detail ?? readConsent();
       applyConsent(consent);
-      setAnalyticsAllowed(Boolean(consent?.analytics));
     };
 
     window.addEventListener("sektorel:consent-changed", handleConsentChanged);
 
     return () => {
-      window.clearTimeout(timeoutId);
       window.removeEventListener("sektorel:consent-changed", handleConsentChanged);
     };
   }, []);
 
-  useEffect(() => {
-    if (!analyticsAllowed || !scriptReady || !pathname) return;
+  const initializeAnalytics = () => {
+    if (configuredRef.current) return;
+
+    setDefaultConsent();
+    applyConsent(readConsent());
 
     const gtag = ensureGtag();
-    gtag("event", "page_view", {
-      page_location: window.location.href,
-      page_path: pathname,
-      page_title: document.title,
+    gtag("js", new Date());
+    gtag("config", GA_MEASUREMENT_ID, {
+      send_page_view: false,
     });
-  }, [analyticsAllowed, pathname, scriptReady]);
 
-  if (!analyticsAllowed) return null;
+    configuredRef.current = true;
+
+    if (currentPathRef.current) {
+      sendPageView(currentPathRef.current);
+    }
+  };
 
   return (
-    <>
-      <Script
-        id="google-consent-default"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = window.gtag || gtag;
-            gtag('consent', 'default', {
-              analytics_storage: 'denied',
-              ad_storage: 'denied',
-              ad_user_data: 'denied',
-              ad_personalization: 'denied',
-              wait_for_update: 500
-            });
-          `,
-        }}
-      />
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script
-        id="google-analytics-config"
-        strategy="afterInteractive"
-        onReady={() => {
-          const consent = readConsent();
-          applyConsent(consent);
-
-          const gtag = ensureGtag();
-          gtag("js", new Date());
-          gtag("config", GA_MEASUREMENT_ID, {
-            send_page_view: false,
-          });
-          setScriptReady(true);
-        }}
-      />
-    </>
+    <Script
+      id="google-analytics"
+      src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+      strategy="afterInteractive"
+      onLoad={initializeAnalytics}
+      onReady={initializeAnalytics}
+    />
   );
 }
