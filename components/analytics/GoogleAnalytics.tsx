@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   CONSENT_STORAGE_KEY,
   type ConsentPreferences,
@@ -87,25 +87,22 @@ function sendPageView(pathname: string) {
 
 export default function GoogleAnalytics() {
   const pathname = usePathname();
-  const [consentInitialized, setConsentInitialized] = useState(false);
-  const [analyticsAllowed, setAnalyticsAllowed] = useState<boolean | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
   const configuredRef = useRef(false);
-  const previousAnalyticsAllowedRef = useRef<boolean | null>(null);
+  const currentPathRef = useRef(pathname);
 
   useEffect(() => {
-    setDefaultConsent();
+    currentPathRef.current = pathname;
 
-    const consent = readConsent();
-    applyConsent(consent);
-    setAnalyticsAllowed(Boolean(consent?.analytics));
-    setConsentInitialized(true);
+    if (configuredRef.current && pathname) {
+      sendPageView(pathname);
+    }
+  }, [pathname]);
 
+  useEffect(() => {
     const handleConsentChanged = (event: Event) => {
       const customEvent = event as CustomEvent<ConsentPreferences>;
-      const nextConsent = customEvent.detail ?? readConsent();
-      applyConsent(nextConsent);
-      setAnalyticsAllowed(Boolean(nextConsent?.analytics));
+      const consent = customEvent.detail ?? readConsent();
+      applyConsent(consent);
     };
 
     window.addEventListener("sektorel:consent-changed", handleConsentChanged);
@@ -115,31 +112,11 @@ export default function GoogleAnalytics() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!scriptReady || !pathname) return;
-    sendPageView(pathname);
-  }, [pathname, scriptReady]);
-
-  useEffect(() => {
-    const previous = previousAnalyticsAllowedRef.current;
-
-    if (
-      scriptReady &&
-      pathname &&
-      previous === false &&
-      analyticsAllowed === true
-    ) {
-      sendPageView(pathname);
-    }
-
-    previousAnalyticsAllowedRef.current = analyticsAllowed;
-  }, [analyticsAllowed, pathname, scriptReady]);
-
   const initializeAnalytics = () => {
-    if (configuredRef.current) {
-      setScriptReady(true);
-      return;
-    }
+    if (configuredRef.current) return;
+
+    setDefaultConsent();
+    applyConsent(readConsent());
 
     const gtag = ensureGtag();
     gtag("js", new Date());
@@ -148,10 +125,11 @@ export default function GoogleAnalytics() {
     });
 
     configuredRef.current = true;
-    setScriptReady(true);
-  };
 
-  if (!consentInitialized) return null;
+    if (currentPathRef.current) {
+      sendPageView(currentPathRef.current);
+    }
+  };
 
   return (
     <Script
