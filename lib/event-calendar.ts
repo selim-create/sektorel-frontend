@@ -57,6 +57,17 @@ function stripHtml(value?: string | null) {
     .trim();
 }
 
+function buildStableUidSeed(value: string) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
 export function buildGoogleCalendarUrl(input: CalendarEventInput) {
   const { start, end } = resolveDates(input);
   const params = new URLSearchParams({
@@ -89,7 +100,7 @@ export function buildIcsDataUrl(input: CalendarEventInput) {
   const { start, end } = resolveDates(input);
   const description = [stripHtml(input.description), input.url].filter(Boolean).join("\n\n");
   const uidSeed = `${input.title}-${input.startDate}-${input.url || "sektorel-ajanda"}`;
-  const uid = `${Buffer.from(uidSeed).toString("base64url").slice(0, 40)}@sektorelajanda.com`;
+  const uid = `${buildStableUidSeed(uidSeed)}@sektorelajanda.com`;
   const now = formatGoogleDate(new Date());
 
   const lines = [
