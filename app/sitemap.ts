@@ -36,7 +36,7 @@ type LocationOptionsResponse = {
   };
 };
 
-type CompanyCombinationNode = {
+type CompanySitemapNode = SitemapNode & {
   sectors?: {
     nodes?: Array<{ slug?: string | null } | null> | null;
   } | null;
@@ -45,17 +45,25 @@ type CompanyCombinationNode = {
   } | null;
 };
 
-type CompanyCombinationResponse = {
+type CompanySitemapResponse = {
   data?: {
     companies?: {
-      nodes?: Array<CompanyCombinationNode | null> | null;
+      nodes?: Array<CompanySitemapNode | null> | null;
       pageInfo?: ConnectionPageInfo | null;
     } | null;
   };
 };
 
+type LocationSnapshot = {
+  cities: Array<LocationOption & { slug: string }>;
+  districts: Array<{
+    citySlug: string;
+    district: LocationOption & { slug: string };
+  }>;
+};
+
 type ConnectionDefinition = {
-  name: "companies" | "sectors" | "posts" | "events" | "leads" | "jobs" | "categories" | "tags";
+  name: "sectors" | "posts" | "events" | "leads" | "jobs" | "categories" | "tags";
   path: string;
   changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
   priority: number;
@@ -63,8 +71,10 @@ type ConnectionDefinition = {
   whereClause?: string;
 };
 
+const SITEMAP_REVALIDATE_SECONDS = 3600;
+const DISTRICT_BATCH_SIZE = 8;
+
 const CONNECTIONS: ConnectionDefinition[] = [
-  { name: "companies", path: "/firma", changeFrequency: "weekly", priority: 0.8, hasModified: true },
   { name: "sectors", path: "/sektor", changeFrequency: "weekly", priority: 0.8, hasModified: false },
   { name: "posts", path: "/haber", changeFrequency: "daily", priority: 0.7, hasModified: true },
   { name: "events", path: "/ajanda", changeFrequency: "daily", priority: 0.7, hasModified: true },
@@ -117,7 +127,7 @@ async function postGraphQL<TData>(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
-    next: { revalidate: 3600 },
+    next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
   });
 
   if (!response.ok) {
@@ -173,6 +183,58 @@ async function fetchConnection(definition: ConnectionDefinition) {
     }));
 }
 
+async function fetchCompanySitemapNodes() {
+  const nodes: CompanySitemapNode[] = [];
+  const seenCursors = new Set<string>();
+  let after: string | null = null;
+
+  do {
+    const query = `
+      query SitemapCompanies($first: Int!, $after: String) {
+        companies(first: $first, after: $after) {
+          nodes {
+            slug
+            modified
+            sectors { nodes { slug } }
+            locations { nodes { slug } }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    `;
+
+    const payload = await postGraphQL<CompanySitemapResponse>(query, {
+      first: 100,
+      after,
+    });
+    const connection = payload.data?.companies;
+
+    nodes.push(
+      ...(connection?.nodes ?? []).filter(
+        (node): node is CompanySitemapNode => Boolean(node),
+      ),
+    );
+
+    const nextCursor = getNextCursor(connection?.pageInfo, seenCursors);
+    if (!nextCursor) break;
+    seenCursors.add(nextCursor);
+    after = nextCursor;
+  } while (after);
+
+  return nodes;
+}
+
+function buildCompanyRoutes(companies: CompanySitemapNode[]): MetadataRoute.Sitemap {
+  return companies
+    .filter((company): company is CompanySitemapNode & { slug: string } => Boolean(company.slug))
+    .map((company) => ({
+      url: absoluteUrl(`/firma/${company.slug}`),
+      lastModified: company.modified ? new Date(company.modified) : undefined,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    }));
+}
+
 async function fetchLocationOptions(type: "city" | "district", parentSlug?: string) {
   const query = `
     query SitemapLocationOptions($type: String!, $parentSlug: String, $first: Int!) {
@@ -186,7 +248,7 @@ async function fetchLocationOptions(type: "city" | "district", parentSlug?: stri
     }
   `;
 
-  const payload: LocationOptionsResponse = await postGraphQL<LocationOptionsResponse>(query, {
+  const payload = await postGraphQL<LocationOptionsResponse>(query, {
     type,
     parentSlug: parentSlug ?? null,
     first: 200,
@@ -197,85 +259,54 @@ async function fetchLocationOptions(type: "city" | "district", parentSlug?: stri
   );
 }
 
-async function fetchLocationRoutes(): Promise<MetadataRoute.Sitemap> {
+async function fetchLocationSnapshot(): Promise<LocationSnapshot> {
   const cities = await fetchLocationOptions("city");
-  const cityRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
+  const districts: LocationSnapshot["districts"] = [];
+
+  for (let index = 0; index < cities.length; index += DISTRICT_BATCH_SIZE) {
+    const batch = cities.slice(index, index + DISTRICT_BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((city) => fetchLocationOptions("district", city.slug)),
+    );
+
+    results.forEach((result, resultIndex) => {
+      if (result.status !== "fulfilled") return;
+      const city = batch[resultIndex];
+      if (!city) return;
+
+      result.value.forEach((district) => {
+        districts.push({ citySlug: city.slug, district });
+      });
+    });
+  }
+
+  return { cities, districts };
+}
+
+function buildLocationRoutes(snapshot: LocationSnapshot): MetadataRoute.Sitemap {
+  const cityRoutes: MetadataRoute.Sitemap = snapshot.cities.map((city) => ({
     url: absoluteUrl(`/${city.slug}`),
     changeFrequency: "weekly",
     priority: 0.85,
   }));
 
-  const districtResults = await Promise.allSettled(
-    cities.map(async (city) => {
-      const districts = await fetchLocationOptions("district", city.slug);
-      return districts.map((district): MetadataRoute.Sitemap[number] => ({
-        url: absoluteUrl(`/${city.slug}/${district.slug}`),
-        changeFrequency: "weekly",
-        priority: 0.75,
-      }));
-    }),
-  );
-
-  const districtRoutes = districtResults.flatMap((result) =>
-    result.status === "fulfilled" ? result.value : [],
-  );
+  const districtRoutes: MetadataRoute.Sitemap = snapshot.districts.map(({ citySlug, district }) => ({
+    url: absoluteUrl(`/${citySlug}/${district.slug}`),
+    changeFrequency: "weekly",
+    priority: 0.75,
+  }));
 
   return [...cityRoutes, ...districtRoutes];
 }
 
-async function fetchCompanyCombinationNodes() {
-  const nodes: CompanyCombinationNode[] = [];
-  const seenCursors = new Set<string>();
-  let after: string | null = null;
-
-  do {
-    const query = `
-      query SitemapCompanyCombinations($first: Int!, $after: String) {
-        companies(first: $first, after: $after) {
-          nodes {
-            sectors { nodes { slug } }
-            locations { nodes { slug } }
-          }
-          pageInfo { hasNextPage endCursor }
-        }
-      }
-    `;
-
-    const payload: CompanyCombinationResponse =
-      await postGraphQL<CompanyCombinationResponse>(query, {
-        first: 100,
-        after,
-      });
-    const connection = payload.data?.companies;
-
-    nodes.push(
-      ...(connection?.nodes ?? []).filter(
-        (node): node is CompanyCombinationNode => Boolean(node),
-      ),
-    );
-
-    const nextCursor = getNextCursor(connection?.pageInfo, seenCursors);
-    if (!nextCursor) break;
-    seenCursors.add(nextCursor);
-    after = nextCursor;
-  } while (after);
-
-  return nodes;
-}
-
-async function fetchCitySectorRoutes(): Promise<MetadataRoute.Sitemap> {
-  const cities = await fetchLocationOptions("city");
-  const citySlugs = new Set(cities.map((city) => city.slug));
-  const districtToCity = new Map<string, string>();
-
-  await Promise.all(
-    cities.map(async (city) => {
-      const districts = await fetchLocationOptions("district", city.slug);
-      districts.forEach((district) => districtToCity.set(district.slug, city.slug));
-    }),
+function buildCitySectorRoutes(
+  companies: CompanySitemapNode[],
+  snapshot: LocationSnapshot,
+): MetadataRoute.Sitemap {
+  const citySlugs = new Set(snapshot.cities.map((city) => city.slug));
+  const districtToCity = new Map(
+    snapshot.districts.map(({ citySlug, district }) => [district.slug, citySlug]),
   );
-
-  const companies = await fetchCompanyCombinationNodes();
   const combinations = new Set<string>();
 
   companies.forEach((company) => {
@@ -308,20 +339,25 @@ async function fetchCitySectorRoutes(): Promise<MetadataRoute.Sitemap> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [connectionResults, locationResult, citySectorResult] = await Promise.all([
+  const emptyLocations: LocationSnapshot = { cities: [], districts: [] };
+  const [connectionResults, companies, locationSnapshot] = await Promise.all([
     Promise.allSettled(CONNECTIONS.map(fetchConnection)),
-    fetchLocationRoutes().catch(() => [] as MetadataRoute.Sitemap),
-    fetchCitySectorRoutes().catch(() => [] as MetadataRoute.Sitemap),
+    fetchCompanySitemapNodes().catch(() => [] as CompanySitemapNode[]),
+    fetchLocationSnapshot().catch(() => emptyLocations),
   ]);
 
   const dynamicRoutes = connectionResults.flatMap((result) =>
     result.status === "fulfilled" ? result.value : [],
   );
+  const companyRoutes = buildCompanyRoutes(companies);
+  const locationRoutes = buildLocationRoutes(locationSnapshot);
+  const citySectorRoutes = buildCitySectorRoutes(companies, locationSnapshot);
 
   return [
     ...STATIC_ROUTES,
     ...dynamicRoutes,
-    ...locationResult,
-    ...citySectorResult,
+    ...companyRoutes,
+    ...locationRoutes,
+    ...citySectorRoutes,
   ];
 }
