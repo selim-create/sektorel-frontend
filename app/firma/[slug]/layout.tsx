@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { gql } from "@apollo/client";
 import CompanyClaimControl from "@/components/companies/CompanyClaimControl";
@@ -95,7 +96,7 @@ type CompanySeoData = {
   } | null;
 };
 
-async function getCompany(slug: string) {
+const getCompany = cache(async (slug: string) => {
   const { data } = await queryWithFallback<CompanySeoData>(
     {
       query: COMPANY_SEO_QUERY,
@@ -106,7 +107,7 @@ async function getCompany(slug: string) {
   );
 
   return data.company ?? null;
-}
+});
 
 export async function generateMetadata({
   params,
