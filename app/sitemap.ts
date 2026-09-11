@@ -54,12 +54,41 @@ type CompanySitemapResponse = {
   };
 };
 
+type CompanySnapshotResponse = {
+  nodes?: Array<{
+    id?: number | null;
+    slug?: string | null;
+    modified?: string | null;
+  } | null> | null;
+  has_more?: boolean | null;
+  next_after_id?: number | null;
+};
+
+type LocationSnapshotResponse = {
+  cities?: Array<{ id?: number | null; slug?: string | null } | null> | null;
+  districts?: Array<{
+    id?: number | null;
+    slug?: string | null;
+    city_slug?: string | null;
+  } | null> | null;
+};
+
+type CitySectorSnapshotResponse = {
+  routes?: Array<string | null> | null;
+};
+
 type LocationSnapshot = {
   cities: Array<LocationOption & { slug: string }>;
   districts: Array<{
     citySlug: string;
     district: LocationOption & { slug: string };
   }>;
+};
+
+type SnapshotBundle = {
+  companies: CompanySitemapNode[];
+  locations: LocationSnapshot;
+  citySectorRoutes: MetadataRoute.Sitemap;
 };
 
 type ConnectionDefinition = {
@@ -73,6 +102,8 @@ type ConnectionDefinition = {
 
 const SITEMAP_REVALIDATE_SECONDS = 3600;
 const DISTRICT_BATCH_SIZE = 8;
+const COMPANY_SNAPSHOT_LIMIT = 2000;
+const WORDPRESS_ORIGIN = new URL(GRAPHQL_ENDPOINT).origin;
 
 const CONNECTIONS: ConnectionDefinition[] = [
   { name: "sectors", path: "/sektor", changeFrequency: "weekly", priority: 0.8, hasModified: false },
@@ -137,6 +168,19 @@ async function postGraphQL<TData>(
   return (await response.json()) as TData;
 }
 
+async function getSnapshot<TData>(path: string): Promise<TData> {
+  const response = await fetch(`${WORDPRESS_ORIGIN}${path}`, {
+    headers: { accept: "application/json" },
+    next: { revalidate: SITEMAP_REVALIDATE_SECONDS },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Sitemap snapshot failed: ${response.status}`);
+  }
+
+  return (await response.json()) as TData;
+}
+
 function getNextCursor(pageInfo?: ConnectionPageInfo | null, seenCursors?: Set<string>) {
   if (!pageInfo?.hasNextPage || !pageInfo.endCursor) return null;
   if (seenCursors?.has(pageInfo.endCursor)) return null;
@@ -183,7 +227,67 @@ async function fetchConnection(definition: ConnectionDefinition) {
     }));
 }
 
-async function fetchCompanySitemapNodes() {
+async function fetchCompanySnapshot(): Promise<CompanySitemapNode[]> {
+  const companies: CompanySitemapNode[] = [];
+  let afterId = 0;
+  const seenIds = new Set<number>();
+
+  do {
+    const payload = await getSnapshot<CompanySnapshotResponse>(
+      `/wp-json/sektorel/v1/sitemap/companies?after_id=${afterId}&limit=${COMPANY_SNAPSHOT_LIMIT}`,
+    );
+
+    for (const node of payload.nodes ?? []) {
+      if (!node?.slug) continue;
+      companies.push({ slug: node.slug, modified: node.modified ?? null });
+    }
+
+    if (!payload.has_more || !payload.next_after_id) break;
+    if (seenIds.has(payload.next_after_id)) break;
+    seenIds.add(payload.next_after_id);
+    afterId = payload.next_after_id;
+  } while (afterId > 0);
+
+  return companies;
+}
+
+async function fetchLocationSnapshotRest(): Promise<LocationSnapshot> {
+  const payload = await getSnapshot<LocationSnapshotResponse>(
+    "/wp-json/sektorel/v1/sitemap/locations",
+  );
+
+  const cities: LocationSnapshot["cities"] = (payload.cities ?? [])
+    .filter((city): city is NonNullable<typeof city> & { slug: string } => Boolean(city?.slug))
+    .map((city) => ({ databaseId: city.id ?? undefined, slug: city.slug }));
+
+  const districts: LocationSnapshot["districts"] = (payload.districts ?? [])
+    .filter(
+      (district): district is NonNullable<typeof district> & { slug: string; city_slug: string } =>
+        Boolean(district?.slug && district.city_slug),
+    )
+    .map((district) => ({
+      citySlug: district.city_slug,
+      district: { databaseId: district.id ?? undefined, slug: district.slug },
+    }));
+
+  return { cities, districts };
+}
+
+async function fetchCitySectorRoutesRest(): Promise<MetadataRoute.Sitemap> {
+  const payload = await getSnapshot<CitySectorSnapshotResponse>(
+    "/wp-json/sektorel/v1/sitemap/city-sectors",
+  );
+
+  return (payload.routes ?? [])
+    .filter((route): route is string => Boolean(route))
+    .map((route) => ({
+      url: absoluteUrl(`/${route}`),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    }));
+}
+
+async function fetchCompanySitemapNodesGraphQL() {
   const nodes: CompanySitemapNode[] = [];
   const seenCursors = new Set<string>();
   let after: string | null = null;
@@ -259,7 +363,7 @@ async function fetchLocationOptions(type: "city" | "district", parentSlug?: stri
   );
 }
 
-async function fetchLocationSnapshot(): Promise<LocationSnapshot> {
+async function fetchLocationSnapshotGraphQL(): Promise<LocationSnapshot> {
   const cities = await fetchLocationOptions("city");
   const districts: LocationSnapshot["districts"] = [];
 
@@ -338,26 +442,52 @@ function buildCitySectorRoutes(
   }));
 }
 
+async function fetchSnapshotBundle(): Promise<SnapshotBundle> {
+  try {
+    const [companies, locations, citySectorRoutes] = await Promise.all([
+      fetchCompanySnapshot(),
+      fetchLocationSnapshotRest(),
+      fetchCitySectorRoutesRest(),
+    ]);
+
+    return { companies, locations, citySectorRoutes };
+  } catch {
+    const [companies, locations] = await Promise.all([
+      fetchCompanySitemapNodesGraphQL(),
+      fetchLocationSnapshotGraphQL(),
+    ]);
+
+    return {
+      companies,
+      locations,
+      citySectorRoutes: buildCitySectorRoutes(companies, locations),
+    };
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const emptyLocations: LocationSnapshot = { cities: [], districts: [] };
-  const [connectionResults, companies, locationSnapshot] = await Promise.all([
+  const emptySnapshot: SnapshotBundle = {
+    companies: [],
+    locations: { cities: [], districts: [] },
+    citySectorRoutes: [],
+  };
+
+  const [connectionResults, snapshot] = await Promise.all([
     Promise.allSettled(CONNECTIONS.map(fetchConnection)),
-    fetchCompanySitemapNodes().catch(() => [] as CompanySitemapNode[]),
-    fetchLocationSnapshot().catch(() => emptyLocations),
+    fetchSnapshotBundle().catch(() => emptySnapshot),
   ]);
 
   const dynamicRoutes = connectionResults.flatMap((result) =>
     result.status === "fulfilled" ? result.value : [],
   );
-  const companyRoutes = buildCompanyRoutes(companies);
-  const locationRoutes = buildLocationRoutes(locationSnapshot);
-  const citySectorRoutes = buildCitySectorRoutes(companies, locationSnapshot);
+  const companyRoutes = buildCompanyRoutes(snapshot.companies);
+  const locationRoutes = buildLocationRoutes(snapshot.locations);
 
   return [
     ...STATIC_ROUTES,
     ...dynamicRoutes,
     ...companyRoutes,
     ...locationRoutes,
-    ...citySectorRoutes,
+    ...snapshot.citySectorRoutes,
   ];
 }
