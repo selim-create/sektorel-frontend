@@ -56,6 +56,7 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
       <Link
         className="relative mx-auto block aspect-square w-28 shrink-0 overflow-hidden border border-gray-200 bg-gray-50 sm:mx-0 sm:w-32"
         href={`/firma/${slug}`}
+        prefetch={false}
       >
         {imageSrc ? (
           <Image
@@ -75,12 +76,13 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="line-clamp-2 text-lg font-black leading-6 text-secondary transition-colors group-hover:text-primary">
-              <Link href={`/firma/${slug}`}>{title}</Link>
+              <Link href={`/firma/${slug}`} prefetch={false}>{title}</Link>
             </h3>
             {primarySector?.name ? (
               <Link
                 className="mt-2 inline-flex max-w-full bg-orange-50 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-primary hover:bg-orange-100"
                 href={primarySector.slug ? `/firmalar?sector=${primarySector.slug}` : "/firmalar"}
+                prefetch={false}
               >
                 <span className="truncate">{primarySector.name}</span>
               </Link>
@@ -94,6 +96,7 @@ export default function CompanyCard({ company, featured = false }: CompanyCardPr
           <Link
             className="font-semibold text-secondary hover:text-primary"
             href={primaryLocation?.slug ? `/firmalar?location=${primaryLocation.slug}` : "/firmalar"}
+            prefetch={false}
           >
             {locationName}
           </Link>
