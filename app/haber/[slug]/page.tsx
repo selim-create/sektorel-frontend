@@ -1,3 +1,8 @@
+import NewsletterForm from "@/components/newsletter/NewsletterForm";
+import ArticleShare from "@/components/news/ArticleShare";
+import ArticleEmbeds from "@/components/news/ArticleEmbeds";
+import { absoluteUrl } from "@/lib/site";
+import "./article-content.css";
 import Link from "next/link";
 import FallbackUI from "@/components/error/FallbackUI";
 import { queryWithFallback } from "@/lib/graphql-client";
@@ -6,18 +11,11 @@ import {
   Calendar, 
   Clock, 
   User, 
-  Share2, 
-  Facebook, 
-  Twitter, 
-  Linkedin, 
-  Copy, 
   Tag, 
   ChevronRight,
   MessageSquare,
   TrendingUp,
   ArrowLeft,
-  Building2,
-  MapPin
 } from "lucide-react";
 
 // GraphQL Sorgusu
@@ -38,9 +36,8 @@ const GET_POST_DATA = gql`
       author {
         node {
           name
-          avatar {
-            url
-          }
+          slug
+          avatar { url }
         }
       }
       categories {
@@ -112,7 +109,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
   
   // Basit okuma süresi hesabı (HTML etiketlerini temizlemeden kaba bir tahmin)
   const wordCount = post.content ? post.content.replace(/<[^>]*>/g, '').split(/\s+/).length : 0;
-  const readTime = Math.ceil(wordCount / 200); // Ortalama 200 kelime/dakika
+  const readTime = Math.max(1, Math.ceil(wordCount / 200)); // Ortalama 200 kelime/dakika
 
   // Kategori (İlk kategori)
   const category = post.categories?.nodes[0];
@@ -177,44 +174,34 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
       <div className="container mx-auto px-4 max-w-5xl py-12">
         <div className="flex flex-col lg:flex-row gap-12">
           
-          {/* SOL: Paylaşım Barı (Sticky) */}
-          <aside className="hidden lg:flex flex-col gap-4 w-12 sticky top-32 h-fit">
-            <span className="text-[10px] font-bold text-gray-400 uppercase rotate-90 origin-left translate-x-4 mb-8 whitespace-nowrap">Paylaş</span>
-            <button className="w-10 h-10 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#1877F2] hover:border-[#1877F2] transition-colors bg-white rounded-full">
-              <Facebook size={18} />
-            </button>
-            <button className="w-10 h-10 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#1DA1F2] hover:border-[#1DA1F2] transition-colors bg-white rounded-full">
-              <Twitter size={18} />
-            </button>
-            <button className="w-10 h-10 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0A66C2] hover:border-[#0A66C2] transition-colors bg-white rounded-full">
-              <Linkedin size={18} />
-            </button>
-            <button className="w-10 h-10 border border-gray-200 flex items-center justify-center text-gray-400 hover:text-secondary hover:border-secondary transition-colors bg-white rounded-full">
-              <Copy size={18} />
-            </button>
+          {/* Sticky paylaşım, tam header yüksekliğinin altında kalır. */}
+          <aside className="hidden lg:block w-16 shrink-0 self-stretch">
+            <div className="sticky top-[220px]">
+              <ArticleShare url={absoluteUrl(`/haber/${post.slug}`)} title={post.title} />
+            </div>
           </aside>
 
           {/* ORTA: Makale İçeriği */}
-          <article className="flex-1 max-w-3xl">
+          <article className="min-w-0 flex-1 max-w-3xl">
+            <div className="mb-8 lg:hidden">
+              <ArticleShare url={absoluteUrl(`/haber/${post.slug}`)} title={post.title} />
+            </div>
+
             {/* Excerpt (Özet) - HTML varsa temizle */}
             {post.excerpt && (
               <div 
-                className="text-xl md:text-2xl font-serif text-gray-600 leading-relaxed mb-8 font-medium border-l-4 border-primary pl-4"
+                className="news-article-excerpt text-xl md:text-2xl font-serif text-gray-600 leading-relaxed mb-8 font-medium border-l-4 border-primary pl-4"
                 dangerouslySetInnerHTML={{ __html: post.excerpt }}
               />
             )}
 
             {/* İçerik (HTML render) */}
             <div 
-              className="prose prose-lg prose-gray max-w-none 
-              prose-headings:font-black prose-headings:text-secondary prose-headings:uppercase prose-headings:tracking-tight
-              prose-p:text-gray-600 prose-p:leading-relaxed
-              prose-a:text-primary prose-a:font-bold prose-a:no-underline hover:prose-a:underline
-              prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:italic prose-blockquote:text-gray-700
-              prose-li:marker:text-primary
-              prose-img:rounded-none prose-img:shadow-md"
+              className="news-article-content"
               dangerouslySetInnerHTML={{ __html: post.content }} 
             />
+
+            <ArticleEmbeds />
 
             {/* Etiketler */}
             {post.tags?.nodes?.length > 0 && (
@@ -243,7 +230,9 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
                 <p className="text-xs text-gray-500 leading-relaxed">
                   Sektörel Ajanda editörleri tarafından hazırlanmıştır. Güncel mevzuat ve piyasa analizleri için takipte kalın.
                 </p>
-                <button className="text-primary text-xs font-bold mt-2 hover:underline">Tüm Yazılarını Gör</button>
+                {post.author?.node?.slug ? (
+                  <Link href={`/yazar/${encodeURIComponent(post.author.node.slug)}`} className="inline-block text-primary text-xs font-bold mt-2 hover:underline">Tüm Yazılarını Gör</Link>
+                ) : null}
               </div>
             </div>
           </article>
@@ -252,7 +241,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
           <aside className="w-full lg:w-1/4 space-y-8">
             
             {/* İlgili Haberler */}
-            <div className="bg-white border border-gray-200 p-6 shadow-sm sticky top-32">
+            <div className="bg-white border border-gray-200 p-6 shadow-sm lg:sticky lg:top-[220px]">
               <h3 className="text-sm font-black text-secondary uppercase tracking-widest mb-6 border-b border-gray-100 pb-2 flex items-center gap-2">
                 <TrendingUp size={16} className="text-primary"/> İlgili Haberler
               </h3>
@@ -276,14 +265,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ slu
                 ))}
               </div>
               
-              <div className="mt-8 pt-6 border-t border-gray-100">
-                <h3 className="text-xs font-black text-secondary uppercase mb-3">Bültene Abone Ol</h3>
-                <p className="text-[10px] text-gray-500 mb-3">Benzer mevzuat haberleri e-postana gelsin.</p>
-                <div className="flex">
-                  <input type="email" placeholder="E-posta" className="w-full bg-gray-50 border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:border-primary" />
-                  <button className="bg-secondary text-white px-3 py-2 text-xs font-bold hover:bg-black">→</button>
-                </div>
-              </div>
+              <NewsletterForm source="sektorel-ajanda_news_sidebar" variant="sidebar" />
             </div>
           </aside>
 
